@@ -23,6 +23,13 @@
   ],
   "announcements": [
     {
+      "id": "v1014b",
+      "title": "v1.0.14b: two multiplayer fixes",
+      "body": "Community activity on Rooms lost its peak hours whenever another mod was picked on Statistics — and those figures had never really been the community's. Fixed, and it counts every mod now. The desktop notice also stops arriving inside a frame. Notes and manual download.",
+      "url": "https://github.com/Gorgorito12/AoE3-Mod-Launcher/blob/main/releases/v1.0.14b.md",
+      "date": "2026-09-05"
+    },
+    {
       "id": "v1014a",
       "title": "v1.0.14a: a crash fix for 1.0.14",
       "body": "With the notification panel open, clicking on any text closed the launcher outright. That is fixed. Everything else in 1.0.14 is unchanged — if you have not updated yet, take this one instead.",
