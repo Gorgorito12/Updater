@@ -442,6 +442,16 @@ public static class CivNameResolver
             advanced = true;
         }
 
-        return (name, portrait ?? flag);
+        // THE FLAG FIRST, and the portrait only as a fallback. That looks backwards and is
+        // not: in Wars of Liberty <portrait> was left pointing at the BASE GAME's art while
+        // the mod put its own flag in <homecityflagtexture>. Germans reads
+        // objects\flags\germans - the vanilla white flag with the eagle - against
+        // "War of the Triple Alliance\Flags\prussia", the black-white-red one the mod
+        // actually ships; French reads the Bourbon navy-and-gold against the tricolour.
+        // Eleven of its civilizations diverge that way, and in every one of them the
+        // home-city flag is the mod's own art and the portrait is a stale base path.
+        // Where the two agree - all of Struggle of Indonesia, and most of WoL - the order
+        // changes nothing.
+        return (name, flag ?? portrait);
     }
 }

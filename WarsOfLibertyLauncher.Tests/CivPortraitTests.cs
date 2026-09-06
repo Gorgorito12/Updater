@@ -71,6 +71,14 @@ public class CivPortraitTests : IDisposable
         <homecityflagtexture>objects\flags\fallback</homecityflagtexture>
       </civ>
       <civ>
+        <!-- The case the first version of this file did not cover, and the reason the wrong
+             flag shipped: the two elements DISAGREE. Verbatim from Wars of Liberty. -->
+        <name>Germans</name>
+        <portrait>objects\flags\germans</portrait>
+        <displaynameid>22866</displaynameid>
+        <homecityflagtexture>War of the Triple Alliance\Flags\prussia</homecityflagtexture>
+      </civ>
+      <civ>
         <name>Fale</name>
         <displaynameid>2</displaynameid>
       </civ>
@@ -87,11 +95,33 @@ public class CivPortraitTests : IDisposable
     """;
 
     /// <summary>
-    /// THE ONE THAT MATTERS. <c>&lt;portrait&gt;</c> is the flag, and the nested pictures are
-    /// not it — even though one of them is literally called a portrait.
+    /// THE ONE THAT MATTERS, and it used to assert the opposite.
+    ///
+    /// <para>When the two elements disagree the HOME-CITY FLAG wins. It reads backwards until
+    /// you look at the data: in Wars of Liberty <c>&lt;portrait&gt;</c> was left pointing at the
+    /// base game's art while the mod put its own flag in <c>&lt;homecityflagtexture&gt;</c>.
+    /// Germans is <c>objects\flags\germans</c> — the vanilla white flag with the eagle —
+    /// against <c>...\Flags\prussia</c>, the black-white-red one the mod ships. Eleven of its
+    /// civilizations diverge that way and every one of them was drawing the wrong flag.</para>
+    ///
+    /// <para>The first version of this file pinned the wrong order and still passed, because
+    /// its fixture only ever had the two elements AGREEING. That is why the fixture now carries
+    /// a civ where they differ.</para>
     /// </summary>
     [Fact]
-    public void THE_ONE_THAT_MATTERS_ThePortraitIsTakenAndTheNestedArtIsNot()
+    public void THE_ONE_THAT_MATTERS_TheModsOwnFlagBeatsTheStalePortrait()
+    {
+        var map = CivNameResolver.ResolvePortraits(MakeMod("wol", Civs));
+
+        Assert.Equal(@"War of the Triple Alliance\Flags\prussia", map["Germans"]);
+        Assert.NotEqual(@"objects\flags\germans", map["Germans"]);
+    }
+
+    /// <summary>Where the two agree — most of Wars of Liberty, and all of Struggle of
+    /// Indonesia — the order changes nothing. And the nested pictures are still not flags,
+    /// even though one of them is literally called a portrait.</summary>
+    [Fact]
+    public void WhereTheTwoAgreeNothingChanges_AndNestedArtIsStillIgnored()
     {
         var map = CivNameResolver.ResolvePortraits(MakeMod("wol", Civs));
 
@@ -100,12 +130,32 @@ public class CivPortraitTests : IDisposable
         Assert.DoesNotContain(map.Values, v => v.Contains("civ_flags_quick_launch", StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>A civ with no <c>&lt;portrait&gt;</c> falls back to its home-city flag. Between
-    /// the two, 185 of Wars of Liberty's 187 civilizations are covered.</summary>
+    /// <summary>A civ with only a home-city flag uses it — that is now the primary, so this is
+    /// no longer a fallback at all.</summary>
     [Fact]
-    public void TheHomeCityFlagIsTheFallback()
+    public void ACivWithOnlyAHomeCityFlagUsesIt()
         => Assert.Equal(@"objects\flags\fallback",
             CivNameResolver.ResolvePortraits(MakeMod("wol", Civs))["OnlyFlag"]);
+
+    /// <summary>And the portrait is still read when it is the only one there — several WoL
+    /// civilizations carry no home-city flag at all.</summary>
+    [Fact]
+    public void ThePortraitIsTheFallbackNow()
+    {
+        const string onlyPortrait = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <civs>
+          <civ>
+            <name>Peruvians</name>
+            <portrait>War of the Triple Alliance\DLC\Sommer\Peru\Flag\peru</portrait>
+            <displaynameid>620000</displaynameid>
+          </civ>
+        </civs>
+        """;
+
+        Assert.Equal(@"War of the Triple Alliance\DLC\Sommer\Peru\Flag\peru",
+            CivNameResolver.ResolvePortraits(MakeMod("onlyportrait", onlyPortrait))["Peruvians"]);
+    }
 
     /// <summary>
     /// A civ that names no standalone art is ABSENT, not present with an empty string. The

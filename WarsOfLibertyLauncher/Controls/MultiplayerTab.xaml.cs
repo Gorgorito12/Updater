@@ -9731,7 +9731,7 @@ public partial class MultiplayerTab : UserControl
         {
             body.Children.Add(BuildCivRow(
                 row.Label, row.Played, row.Wins, row.Losses, AvgSecondsFor(row.Civ),
-                BuildCivFlag(StatsVocabulary(), row.Civ, 16)));
+                BuildCivFlag(StatsVocabulary(), row.Civ, 20)));
         }
 
         if (tail.Count > 0) body.Children.Add(BuildCivTailRow(tail, minimum));
@@ -10141,8 +10141,8 @@ public partial class MultiplayerTab : UserControl
                 row,
                 StatsCivLabel(row.CivA),
                 StatsCivLabel(row.CivB),
-                BuildCivFlag(v, row.CivA, 16),
-                BuildCivFlag(v, row.CivB, 16)));
+                BuildCivFlag(v, row.CivA, 20),
+                BuildCivFlag(v, row.CivB, 20)));
         }
 
         stack.Children.Add(StatsCard(body));
@@ -10399,7 +10399,8 @@ public partial class MultiplayerTab : UserControl
     {
         var grid = new Grid { Margin = new Thickness(14, 9, 14, 9) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
-        // The flag's column, reserved whether or not there is one to put in it.
+        // The flag's column, reserved whether or not there is one to put in it. Same 22 as
+        // the card icon below it, so a group header and its rows read as one column.
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -10413,7 +10414,7 @@ public partial class MultiplayerTab : UserControl
         caret.SetResourceReference(TextBlock.ForegroundProperty, "MpTextSecondary");
         grid.Children.Add(WithColumn(caret, 0));
 
-        var flag = BuildCivFlag(names, group.Civ, 18);
+        var flag = BuildCivFlag(names, group.Civ, 22);
         if (flag != null) grid.Children.Add(WithColumn(flag, 1));
 
         var name = new TextBlock
