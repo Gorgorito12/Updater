@@ -8873,7 +8873,9 @@ public partial class MultiplayerTab : UserControl
             TextWrapping = TextWrapping.Wrap,
             MaxWidth = 120,
         };
-        label.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
+        // Lower-case words that wrap under the figure - "players in 7 days" - so prose, not a
+        // tag. It stays well under the 15 of the number it belongs to either way.
+        label.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
         label.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
         cell.Children.Add(label);
 
@@ -9147,7 +9149,8 @@ public partial class MultiplayerTab : UserControl
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 3, 8, 0),
         };
-        names.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
+        // Names, not a tag. Same rung as the rest of this page's prose.
+        names.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
         names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
         words.Children.Add(names);
 
@@ -9801,7 +9804,8 @@ public partial class MultiplayerTab : UserControl
             Text = Strings.Get("MpStatsTailCivsWhy"),
             Margin = new Thickness(0, 3, 8, 0),
         };
-        why.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
+        // A whole sentence. Same rung as the footnote that says the same kind of thing.
+        why.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
         why.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
         words.Children.Add(why);
 
@@ -10554,7 +10558,12 @@ public partial class MultiplayerTab : UserControl
             foreach (var line in lines)
             {
                 var block = new TextBlock { Text = line, TextWrapping = TextWrapping.Wrap };
-                block.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
+                // The rung this page already uses for prose - StatsFootnote sits here too.
+                // NOT MpTagSize: at 9 this was the smallest type in the launcher, a token whose
+                // own remarks say it may be that small "because it is always letter-spaced
+                // uppercase inside a chip". These are wrapping sentences, and they were coming
+                // out smaller than the footnotes that explain the table above them.
+                block.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
                 block.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
                 block.Margin = new Thickness(0, 0, 0, 3);
                 text.Children.Add(block);
@@ -10640,7 +10649,8 @@ public partial class MultiplayerTab : UserControl
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 3, 8, 0),
         };
-        names.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
+        // Names, not a tag. Same rung as the rest of this page's prose.
+        names.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
         names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
         words.Children.Add(names);
 

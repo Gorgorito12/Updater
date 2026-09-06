@@ -2133,6 +2133,50 @@ public class DialogXamlTests
     }
 
     /// <summary>
+    /// THE SMALLEST-TYPE ONE. A card's description is prose, so it may not wear the token
+    /// reserved for tags.
+    ///
+    /// <para><c>MpTagSize</c> is 9 - the smallest type in the launcher - and its own remarks
+    /// say it may be that small "because it is always letter-spaced uppercase inside a chip":
+    /// a map's ESOC pack, a bracket's PASA, the TU and MIO markers. The description lines are
+    /// wrapping sentences, and at 9 they came out SMALLER than the footnote that explains the
+    /// table they sit in. The text-size setting scales both, so the gap never closed however
+    /// far it was turned up - which is what "the small text is not scaling" was reporting.</para>
+    ///
+    /// <para>Asserted as a RELATION, not as 10.5. The exact rung belongs to the design handoff
+    /// and may move; what must not come back is prose dropping to the tag rung.</para>
+    /// </summary>
+    [Fact]
+    public void THE_SMALLEST_TYPE_ONE_ADescriptionIsNotTheSmallestTextOnThePage()
+    {
+        var error = RunOnStaThread(() =>
+        {
+            EnsureResources();
+
+            var tag = (double)Application.Current.FindResource("MpTagSize");
+            var footnote = (double)Application.Current.FindResource("MpPillSize");
+
+            var open = Laid(MultiplayerTab.BuildDeckCardRow(
+                new DeckCardRow("HCXPRefrigeration", "Refrigeration", 3, null),
+                VocabularyWith("Delivers 10 Cheriks"),
+                open: true,
+                onToggle: () => { }));
+
+            var line = VisualsUnder(open).OfType<TextBlock>()
+                .Single(t => (t.Text ?? "").Contains("Delivers 10 Cheriks"));
+
+            Assert.True(line.FontSize > tag,
+                $"the description is at {line.FontSize}, the tag rung is {tag} - prose has "
+                + "dropped back to the token meant for uppercase chips.");
+            Assert.True(line.FontSize >= footnote,
+                $"the description is at {line.FontSize} but the footnotes explaining these "
+                + $"tables are at {footnote}; a description smaller than its own footnote reads "
+                + "as an afterthought.");
+        });
+        Assert.Null(error);
+    }
+
+    /// <summary>
     /// Lays an element out before its visual tree is walked. A freshly built control has no
     /// visual children until it is measured, so an assertion over them would pass for the
     /// wrong reason - by finding nothing at all.
