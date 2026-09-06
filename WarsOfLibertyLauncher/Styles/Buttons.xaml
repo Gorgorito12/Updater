@@ -1239,6 +1239,44 @@
          not as a bordered button: inside a chat flow a real button reads as heavier
          than the message it belongs to. Still a Button, so the click, the keyboard
          focus and the disabled state are the framework's. -->
+    <!-- A whole ROW that happens to be clickable: the fold header of a civilization group in
+         the community-cards table. No chrome of its own, stretched content, and a hover that
+         only lifts the background a shade - the row's own text and figures carry the look, and
+         a button frame around them would read as a second control sitting inside the table.
+
+         A Button rather than a Border with a mouse handler so it is reachable by keyboard and
+         announces itself, and so the hit target is the entire header instead of the four-pixel
+         caret at its left edge. -->
+    <Style x:Key="MpBareButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="face" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="face" Property="Background"
+                                    Value="{DynamicResource MpRowHighlight}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="face" Property="Background"
+                                    Value="{DynamicResource MpRowHighlight}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="MpLinkButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource MpActionText}"/>

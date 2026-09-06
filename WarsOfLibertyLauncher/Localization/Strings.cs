@@ -4829,6 +4829,45 @@ public static class Strings
         // the profile's own deck section already owned — a dictionary initializer is indexer
         // assignment, so the later declaration won and this table silently rendered "Your
         // decks" over a community aggregate. Caught by NoKeyIsDeclaredTwice.
+        // --- The community-cards table, folded by civilization ---
+        // The census beside the section label. It states what the table HAS, and nothing
+        // beyond it: a claim about matches or players would be a different number that this
+        // route cannot support.
+        ["MpStatsDecksCardCount"] = new()
+        {
+            [LangEn] = "{0} distinct cards",
+            [LangEs] = "{0} cartas distintas",
+        },
+        ["MpStatsDecksCivCards"] = new()
+        {
+            [LangEn] = "{0} cards",
+            [LangEs] = "{0} cartas",
+        },
+        // Count and share in one cell. The share only appears when there is sample behind it;
+        // below the minimum the count goes in alone and nothing takes the percentage's place.
+        ["MpStatsDecksCountAndShare"] = new()
+        {
+            [LangEn] = "{0} \u00b7 {1} %",
+            [LangEs] = "{0} \u00b7 {1} %",
+        },
+        ["MpStatsTailDecks"] = new()
+        {
+            [LangEn] = "{0} more cards, seen once",
+            [LangEs] = "{0} cartas m\u00e1s, vistas una vez",
+        },
+        ["MpStatsTailDecksWhy"] = new()
+        {
+            [LangEn] = "A card somebody brought once says nothing about what the community "
+                     + "prefers, so those are summed up in one line instead of taking a row each.",
+            [LangEs] = "Una carta que alguien llev\u00f3 una sola vez no dice nada de lo que "
+                     + "prefiere la comunidad, as\u00ed que esas se resumen en una l\u00ednea en vez de "
+                     + "ocupar una fila cada una.",
+        },
+        ["MpStatsDecksMoreCivs"] = new()
+        {
+            [LangEn] = "{0} more civilizations",
+            [LangEs] = "{0} civilizaciones m\u00e1s",
+        },
         ["MpStatsCommunityDecksTitle"] = new()
         {
             [LangEn] = "Cards the community brings",

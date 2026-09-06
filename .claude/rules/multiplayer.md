@@ -4824,6 +4824,33 @@ parameter is absent, so an older launcher receives exactly what it always did.
 - **`/stats/decks` has no mode and cannot have one.** `deck_cards` is not joined to any match; it
   is what each player declares they carry. The table is the same under both switches.
 
+- **THE DECK PERCENTAGE'S DENOMINATOR IS COMPUTED, NOT SENT, AND `Contributors` IS NOT IT.**
+  `DeckStatsResponse.Contributors` counts players who shared a deck for the MOD, so dividing a
+  Mexican card by it counts everyone who never played Mexico. The wire carries no
+  per-civilization deck count either. What it does carry is the generic resource shipments -
+  "Cords of 300 wood" and its siblings are in every deck of every civilization - so the LARGEST
+  `Players` value inside a civilization IS that civilization's deck count. That is the
+  denominator, it lives in `DeckStatsView.Group`, and a percentage computed against anything
+  else is wrong in a way nobody can see on screen.
+  The share is published only at `DeckStatsView.MinDecksForPercent`, which is
+  `CivStatsView.MinDecidedForPercent` by definition rather than by coincidence - two thresholds
+  on one page is a page that contradicts itself. Below it **nothing is drawn in the
+  percentage's place**: not a dash, never a `0 %`. Same rule as the civilization bar.
+  \u26a0 **Today every count is 1**, so every civilization has one deck and no share is
+  publishable at all: each group opens showing only its summary row. That degenerate state is
+  what the maintainer sees right now and it has to look deliberate rather than broken -
+  `WithOneDeckPerCivilization_NothingIsShownButTheTail_AndNoPercentages` is the pin.
+
+- **THE CIVILIZATION IS A GROUP HEADER, NOT A COLUMN, AND THE FOLD IS KEYED BY THE INTERNAL
+  NAME.** As a column it repeated the same value twelve and twenty rows running - half the
+  table's width spent on a constant. The fold state lives on `MultiplayerTab`, not below it,
+  because `RenderStatsTab` rebuilds the whole page on every payload and only restores the
+  scroll offset; anything held lower is thrown away under the player's hands. It is keyed by
+  the INTERNAL civ name so resolution arriving mid-session does not lose the player's place,
+  and cleared when the page's mod changes, since another mod's civilizations are a different
+  set. The default-open group is chosen ONCE (`_deckCivsSeeded`) - re-deciding it per repaint
+  would slam shut a group that had just been opened.
+
 ---
 
 ## TOURNAMENTS
