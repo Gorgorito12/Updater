@@ -139,9 +139,24 @@ public static class CardArtService
         }
 
         /// <summary>
-        /// Every <c>.ddt</c> in every <c>art\*.bar</c>, merged. <b>Only the textures are kept</b> —
-        /// the five archives hold ~45,000 entries between them and barely a third are icons, so
-        /// indexing the rest would be megabytes of strings nothing ever looks up.
+        /// Every <c>.ddt</c> in every archive of the install, merged. <b>Only the textures are
+        /// kept</b> — the archives hold tens of thousands of entries between them and barely a
+        /// third are icons, so indexing the rest would be megabytes of strings nothing ever
+        /// looks up.
+        ///
+        /// <para><b>The archives at the install ROOT are read first, and that order is the whole
+        /// point.</b> <c>art\*.bar</c> is the base game's art; a mod that replaces a texture ships
+        /// the replacement in an archive at the root. Improvement Mod overrides 2,282 of them in
+        /// <c>ImpMod.bar</c>, thirty of which are civilization flags — British, French, Dutch,
+        /// China — so with <c>art\</c> winning, the launcher would draw the vanilla flag beside
+        /// the mod's civilization and look like it was working. Where no mod is involved the two
+        /// layers agree: of Wars of Liberty's 276 shared textures 265 are byte-identical, and the
+        /// eleven that differ are ESO chrome and map screenshots nothing here looks up.</para>
+        ///
+        /// <para><b>The two layers name their entries differently.</b> <c>art\*.bar</c> writes
+        /// <c>objects\flags\x.ddt</c>, the root archives write <c>Art\objects\flags\x.ddt</c> —
+        /// measured, and consistent within each layer. The prefix comes off when the key is
+        /// built, so a single lookup finds either.</para>
         /// </summary>
         private Dictionary<string, (string Bar, BarEntry Entry)> Index()
         {
@@ -152,35 +167,72 @@ public static class CardArtService
                 if (_index != null) return _index;
 
                 var index = new Dictionary<string, (string, BarEntry)>(StringComparer.OrdinalIgnoreCase);
-                var artDir = Path.Combine(_installPath, "art");
 
-                try
+                foreach (var bar in ArtArchives())
                 {
-                    if (Directory.Exists(artDir))
+                    try
                     {
-                        foreach (var bar in Directory.EnumerateFiles(artDir, "*.bar",
-                                     SearchOption.TopDirectoryOnly))
+                        foreach (var entry in BarArchive.ReadIndex(bar))
                         {
-                            foreach (var entry in BarArchive.ReadIndex(bar))
-                            {
-                                if (!entry.Name.EndsWith(DdtExtension, StringComparison.OrdinalIgnoreCase))
-                                    continue;
+                            if (!entry.Name.EndsWith(DdtExtension, StringComparison.OrdinalIgnoreCase))
+                                continue;
 
-                                // First archive wins, which matches the engine's own load order
-                                // closely enough for artwork and keeps the merge deterministic.
-                                index.TryAdd(Normalize(entry.Name), (bar, entry));
-                            }
+                            // First archive wins, and the order above is what decides which.
+                            index.TryAdd(IndexKey(entry.Name), (bar, entry));
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticLog.Write($"CardArtService: could not index archives — {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        DiagnosticLog.Write($"CardArtService: could not index '{bar}' — {ex.Message}");
+                    }
                 }
 
-                DiagnosticLog.Write($"CardArtService: {index.Count} textures indexed in art archives.");
+                DiagnosticLog.Write($"CardArtService: {index.Count} textures indexed in the archives.");
                 return _index = index;
             }
+        }
+
+        /// <summary>
+        /// Where to look, in order: whatever the mod put at the install root, then the base game's
+        /// own <c>art\</c>.
+        ///
+        /// <para>By pattern, <b>never by file name</b> — <c>ImpMod.bar</c> and <c>DataPN.bar</c>
+        /// appear nowhere in this code, so a mod added to the catalogue tomorrow resolves through
+        /// exactly this path with nothing written for it. Adding a mod is a data change.</para>
+        /// </summary>
+        private IEnumerable<string> ArtArchives()
+        {
+            foreach (var bar in BarsIn(_installPath)) yield return bar;
+            foreach (var bar in BarsIn(Path.Combine(_installPath, "art"))) yield return bar;
+        }
+
+        private static IReadOnlyList<string> BarsIn(string directory)
+        {
+            try
+            {
+                return Directory.Exists(directory)
+                    ? Directory.GetFiles(directory, "*.bar", SearchOption.TopDirectoryOnly)
+                    : Array.Empty<string>();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.Write($"CardArtService: could not list '{directory}' — {ex.Message}");
+                return Array.Empty<string>();
+            }
+        }
+
+        /// <summary>
+        /// One key for an entry named either way. The <c>art\</c> the root archives put in front
+        /// is dropped here rather than tried as an extra candidate at lookup time: this fixes the
+        /// index instead of multiplying every search, and <see cref="ArchiveKeys"/> already strips
+        /// the same prefix off the value the XML asked for.
+        /// </summary>
+        private static string IndexKey(string entryName)
+        {
+            var key = Normalize(entryName);
+            return key.StartsWith("art\\", StringComparison.OrdinalIgnoreCase)
+                ? key.Substring(4)
+                : key;
         }
 
         private static IEnumerable<string> Candidates(string relative)

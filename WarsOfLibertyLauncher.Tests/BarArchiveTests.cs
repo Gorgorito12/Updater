@@ -36,60 +36,13 @@ public class BarArchiveTests : IDisposable
         return dir;
     }
 
-    private sealed record Planned(string Name, byte[] Data, uint DeclaredUncompressed);
+    /// <summary>The writer moved to <see cref="TestArchive"/> once the art index and the packed
+    /// civilization list needed it too. Same bytes, one copy.</summary>
+    private string WriteBar(string magic, params TestArchive.Planned[] files) =>
+        TestArchive.Write(Path.Combine(NewDir(), "Art1.bar"), magic, files);
 
-    /// <summary>Writes a real archive: header, payload, then the table that points into it.</summary>
-    private string WriteBar(string magic, params Planned[] files)
-    {
-        var path = Path.Combine(NewDir(), "Art1.bar");
-
-        using var stream = File.Create(path);
-        using var w = new BinaryWriter(stream, Encoding.Unicode);
-
-        w.Write(Encoding.ASCII.GetBytes(magic));
-        w.Write(2u);
-        w.Write(0x44332211u);
-        w.Write(new byte[0x118 - 12]);
-
-        var countAt = stream.Position;
-        w.Write(0u);            // file count, back-filled
-        w.Write(0u);            // toc offset, back-filled
-
-        var offsets = new List<long>();
-        foreach (var file in files)
-        {
-            offsets.Add(stream.Position);
-            w.Write(file.Data);
-        }
-
-        var tocAt = stream.Position;
-        WriteName(w, "Art\\");
-        w.Write((uint)files.Length);
-
-        for (var i = 0; i < files.Length; i++)
-        {
-            w.Write((uint)offsets[i]);
-            w.Write((uint)files[i].Data.Length);
-            w.Write(files[i].DeclaredUncompressed);
-            w.Write(new byte[16]);                  // the timestamp nothing reads
-            WriteName(w, files[i].Name);
-        }
-
-        stream.Position = countAt;
-        w.Write((uint)files.Length);
-        w.Write((uint)tocAt);
-
-        return path;
-    }
-
-    /// <summary>Length in CHARACTERS, then the UTF-16 bytes — the archive's own convention.</summary>
-    private static void WriteName(BinaryWriter w, string name)
-    {
-        w.Write((uint)name.Length);
-        w.Write(Encoding.Unicode.GetBytes(name));
-    }
-
-    private static Planned Entry(string name, byte[] data) => new(name, data, (uint)data.Length);
+    private static TestArchive.Planned Entry(string name, byte[] data) =>
+        TestArchive.Entry(name, data);
 
     // ------------------------------------------------------------------
 
@@ -121,7 +74,7 @@ public class BarArchiveTests : IDisposable
     public void AnEntryWhoseTwoSizesDisagreeIsSkipped()
     {
         var bar = WriteBar("ESPN",
-            new Planned(@"ui\compressed.ddt", new byte[] { 1, 2, 3 }, DeclaredUncompressed: 99),
+            new TestArchive.Planned(@"ui\compressed.ddt", new byte[] { 1, 2, 3 }, DeclaredUncompressed: 99),
             Entry(@"ui\plain.ddt", new byte[] { 4, 5 }));
 
         var index = BarArchive.ReadIndex(bar);

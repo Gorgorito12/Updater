@@ -15,13 +15,19 @@ namespace WarsOfLibertyLauncher.Services;
 public static class ModStringTable
 {
     /// <summary>
-    /// The layers, in the engine's own override order: the expansion-2 table wins, then the
-    /// expansion, then the base. Mods write into the first. Reading them the other way round
-    /// prints the BASE GAME's name for everything a mod renamed.
+    /// The layers, in the engine's own override order: the mod's own table wins, then
+    /// expansion 2, then the expansion, then the base. Reading them the other way round prints
+    /// the BASE GAME's name for everything a mod renamed.
+    ///
+    /// <para><b>The <c>m</c> layer is the mod's</b>, the same suffix as <c>protom.xml</c> and
+    /// <c>techtreem.xml</c>, and it was missing here. Improvement Mod puts all 57 of its
+    /// civilization display names in <c>stringtablem.xml</c> and none of them anywhere else, so
+    /// without this line every one of its 91 civilizations came back nameless. Only that mod
+    /// ships the file today; the other three simply have no <c>m</c> layer to read.</para>
     /// </summary>
     private static readonly string[] Files =
     {
-        "stringtabley.xml", "stringtablex.xml", "stringtable.xml",
+        "stringtablem.xml", "stringtabley.xml", "stringtablex.xml", "stringtable.xml",
     };
 
     /// <summary>
