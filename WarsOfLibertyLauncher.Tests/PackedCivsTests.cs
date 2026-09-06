@@ -124,40 +124,63 @@ public class PackedCivsTests : IDisposable
             CivNameResolver.ResolvePortraits(mod)["Germans"]);
     }
 
-    // ------------------------------------------------------------------ the order
+    // ------------------------------------------------------------------ which list
 
     /// <summary>
-    /// <b>THE ONE THAT WOULD HAVE LOOKED LIKE IT WORKED.</b> These installs carry TWO civilization
-    /// lists: the mod's, in an archive at the root, and the untouched BASE GAME's in
-    /// <c>data\Data.bar</c>. The base copy parses perfectly and yields fourteen civilizations
-    /// instead of ninety-one — not a blank screen, not an exception, just the wrong game's
-    /// civilizations under the mod's name. So the root archive has to win.
+    /// <b>THE ONE THAT LOOKED LIKE IT WORKED.</b> A real install carries SEVEN civilization
+    /// lists — the engine's override layers, 26 civilizations then 45 then 60 and finally the
+    /// mod's 91 — and only the fullest is the one the game plays with.
+    ///
+    /// <para>Taking the first archive that answered picked the 26-civ layer, by alphabet, and
+    /// drew twenty-six base-game civilizations under the mod's name. Worse than the missing
+    /// count: the layers RENUMBER, so the civilizations it did show were labelled wrong. Neither
+    /// symptom throws and neither leaves the screen blank.</para>
+    ///
+    /// <para>The short layer here is named to sort first for exactly that reason.</para>
     /// </summary>
     [Fact]
-    public void THE_ONE_THAT_MATTERS_TheModsListBeatsTheBaseGamesInDataBar()
+    public void THE_ONE_THAT_MATTERS_TheFullestListWinsNotTheFirstOneFound()
     {
-        var install = Path.Combine(_root, "twolists");
+        var install = Path.Combine(_root, "sevenlists");
         Directory.CreateDirectory(Path.Combine(install, "data"));
+        File.WriteAllText(Path.Combine(install, "data", "stringtablem.xml"), Table,
+            new UnicodeEncoding(false, true));
 
+        // The base game's layer: fewer civilizations, and in a different order.
+        TestArchive.Write(Path.Combine(install, "DataP.bar"),
+            TestArchive.Entry(@"Data\civs.xml.xmb", TestXmb.Build(
+                new Node("civs", Children: new()
+                {
+                    TestXmb.Civ("Aztecs", "3", flag: @"objects\flags\aztecs"),
+                    TestXmb.Civ("British", "22861", flag: @"objects\flags\british"),
+                }))));
+
+        // And the same again under data\, which is where the oldest copy lives.
+        TestArchive.Write(Path.Combine(install, "data", "Data.bar"),
+            TestArchive.Entry(@"civs.xml.xmb", TestXmb.Build(
+                new Node("civs", Children: new()
+                {
+                    TestXmb.Civ("Aztecs", "3", flag: @"objects\flags\aztecs"),
+                    TestXmb.Civ("British", "22861", flag: @"objects\flags\british"),
+                }))));
+
+        // The mod's: more civilizations, and Aztecs has moved.
         TestArchive.Write(Path.Combine(install, "TheMod.bar"),
             TestArchive.Entry(@"Data\civs.xml.xmb", TestXmb.Build(
                 new Node("civs", Children: new()
                 {
                     TestXmb.Civ("British", "22861", flag: @"themod\flags\british"),
-                }))));
-
-        TestArchive.Write(Path.Combine(install, "data", "Data.bar"),
-            TestArchive.Entry(@"Data\civs.xml.xmb", TestXmb.Build(
-                new Node("civs", Children: new()
-                {
-                    TestXmb.Civ("British", "22861", flag: @"objects\flags\british"),
-                    TestXmb.Civ("Vanilla", "1", flag: @"objects\flags\vanilla"),
+                    TestXmb.Civ("Aztecs", "3", flag: @"themod\flags\aztecs"),
+                    TestXmb.Civ("Argentinians", "4", flag: @"themod\flags\argentinians"),
                 }))));
 
         var art = CivNameResolver.ResolvePortraits(install);
 
         Assert.Equal(@"themod\flags\british", art["British"]);
-        Assert.False(art.ContainsKey("Vanilla"), "the base game's list won.");
+        Assert.True(art.ContainsKey("Argentinians"), "the shorter layer won: a civilization is missing.");
+
+        // And the numbering is the fullest list's, not the short one's.
+        Assert.Equal("Britain", CivNameResolver.Resolve(install, 1));
     }
 
     /// <summary>And <c>data\Data.bar</c> is still read when it is the only one — a mod that ships

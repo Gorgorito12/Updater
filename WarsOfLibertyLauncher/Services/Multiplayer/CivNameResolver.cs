@@ -112,32 +112,42 @@ public static class CivNameResolver
     /// The <c>&lt;civ&gt;</c> blocks of a mod that ships no loose <c>civs.xml</c>, read out of its
     /// archives. Empty when there is nothing to read, which is an ordinary answer.
     ///
-    /// <para><b>The search ORDER is the part that cannot be got wrong.</b> Both Improvement Mod
-    /// and Napoleonic Era carry TWO copies: their own, in a large archive at the install root,
-    /// and the untouched BASE GAME one in <c>data\Data.bar</c>. The base copy parses perfectly
-    /// and yields fourteen civilizations instead of ninety-one - that would not look like a
-    /// failure, it would look like a mod with almost no civilizations. So the root archives are
-    /// read first and <c>data\Data.bar</c> only if none of them answered.</para>
+    /// <para><b>An install carries SEVEN of these lists, and the FULLEST one is the answer.</b>
+    /// Counted in Improvement Mod: <c>data\Data.bar</c> and <c>DataP.bar</c> hold 26
+    /// civilizations, <c>data\Data2.bar</c> and <c>DataPX.bar</c> hold 45, <c>data\Data3.bar</c>
+    /// and <c>DataPY.bar</c> hold 60, and <c>ImpMod.bar</c> holds the mod's 91. Napoleonic Era is
+    /// the same ladder ending at 88 in <c>DataPN.bar</c>. They are the engine's override layers,
+    /// each one a whole replacement rather than an addition, and only the last is the list the
+    /// game plays with.</para>
+    ///
+    /// <para><b>Reading any but the fullest is worse than reading none.</b> The layers renumber:
+    /// Aztecs sits at index 14 in the 26-civ list and at 18 in the 45-civ one. So a shorter layer
+    /// does not merely drop civilizations, it also mislabels the ones it keeps — and both look
+    /// exactly like a working launcher. Taking the first archive that answered picked
+    /// <c>DataP.bar</c> by alphabet and showed 26 base-game civilizations under the mod's name.</para>
     ///
     /// <para><b>By pattern, never by name.</b> <c>ImpMod.bar</c> and <c>DataPN.bar</c> appear
-    /// nowhere in this code. A mod added to the catalogue tomorrow resolves through exactly this
-    /// path with nothing written for it, which is the house rule: adding a mod is a DATA change,
-    /// never a code change.</para>
+    /// nowhere in this code, and neither does the base game's ladder. A mod added to the
+    /// catalogue tomorrow resolves through exactly this path with nothing written for it, which
+    /// is the house rule: adding a mod is a DATA change, never a code change.</para>
     ///
     /// <para>Not for the UI thread on a first call: the archive holding Improvement Mod's list
-    /// is 551 MB, and although only its index and one entry are read, that is a seek across a
-    /// file that size.</para>
+    /// is 551 MB, and although only its table of contents and one entry are read, that is a seek
+    /// across a file that size.</para>
     /// </summary>
     private static IReadOnlyList<XmbNode> PackedCivs(string installPath)
     {
+        IReadOnlyList<XmbNode> best = Array.Empty<XmbNode>();
+        var from = string.Empty;
+
         foreach (var archive in CivArchives(installPath))
         {
             try
             {
                 foreach (var entry in BarArchive.ReadIndex(archive))
                 {
-                    // Entry names carry each archive's own layout - some prefix them with
-                    // "Data\", some do not - so the tail is what is matched.
+                    // Entry names carry each archive's own layout — some prefix them with
+                    // "Data\", some do not — so the tail is what is matched.
                     if (!entry.Name.EndsWith("civs.xml.xmb", StringComparison.OrdinalIgnoreCase))
                         continue;
 
@@ -153,42 +163,50 @@ public static class CivNameResolver
                         if (civs.Count >= MaxCivs) break;
                         civs.Add(civ);
                     }
-                    if (civs.Count == 0) continue;
 
-                    DiagnosticLog.Write(
-                        $"CivNameResolver: read {civs.Count} civilizations from "
-                        + $"'{Path.GetFileName(archive)}'.");
-                    return civs;
+                    if (civs.Count > best.Count)
+                    {
+                        best = civs;
+                        from = Path.GetFileName(archive);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                DiagnosticLog.Write($"CivNameResolver: could not read '{archive}' - {ex.Message}");
+                DiagnosticLog.Write($"CivNameResolver: could not read '{archive}' — {ex.Message}");
             }
         }
 
-        return Array.Empty<XmbNode>();
+        if (best.Count > 0)
+            DiagnosticLog.Write($"CivNameResolver: read {best.Count} civilizations from '{from}'.");
+
+        return best;
     }
 
-    /// <summary>Where to look, in order: the mod's own archives, then the base game's.</summary>
+    /// <summary>
+    /// Every archive that could hold a civilization list: the install's own, then the base
+    /// game's under <c>data\</c>. All of them are read — see <see cref="PackedCivs"/> for why
+    /// the first answer is not the right one.
+    /// </summary>
     private static IEnumerable<string> CivArchives(string installPath)
     {
-        string[] root;
+        foreach (var bar in BarsIn(installPath)) yield return bar;
+        foreach (var bar in BarsIn(Path.Combine(installPath, "data"))) yield return bar;
+    }
+
+    private static IReadOnlyList<string> BarsIn(string directory)
+    {
         try
         {
-            root = Directory.GetFiles(installPath, "*.bar", SearchOption.TopDirectoryOnly);
+            return Directory.Exists(directory)
+                ? Directory.GetFiles(directory, "*.bar", SearchOption.TopDirectoryOnly)
+                : Array.Empty<string>();
         }
         catch (Exception ex)
         {
-            DiagnosticLog.Write($"CivNameResolver: could not list '{installPath}' - {ex.Message}");
-            yield break;
+            DiagnosticLog.Write($"CivNameResolver: could not list '{directory}' — {ex.Message}");
+            return Array.Empty<string>();
         }
-
-        foreach (var bar in root) yield return bar;
-
-        // LAST, and only as a fallback: this one holds the untouched base-game civ list.
-        var vanilla = Path.Combine(installPath, "data", "Data.bar");
-        if (File.Exists(vanilla)) yield return vanilla;
     }
 
     internal static IReadOnlyList<string?>? BuildTable(string installPath)
