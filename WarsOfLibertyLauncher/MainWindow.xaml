@@ -782,6 +782,14 @@
                                                                             <Setter Property="Text" Value="&#xE789;"/>
                                                                             <Setter Property="Foreground" Value="#E6A54C"/>
                                                                         </DataTrigger>
+                                                                        <!-- A patch for a mod that is NOT installed. Its
+                                                                             own glyph, because it is not the same claim
+                                                                             as UpdateAvailable: there is nothing here to
+                                                                             update, only something published. -->
+                                                                        <DataTrigger Binding="{Binding Kind}" Value="ModPatchPublished">
+                                                                            <Setter Property="Text" Value="&#xE7B8;"/>
+                                                                            <Setter Property="Foreground" Value="#5AA9E6"/>
+                                                                        </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </TextBlock.Style>

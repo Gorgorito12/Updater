@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using WarsOfLibertyLauncher.Models;
 using WarsOfLibertyLauncher.Services;
 using Xunit;
@@ -135,6 +136,111 @@ public class NotificationCenterTests
         Assert.Equal("https://example.com/post", item.TargetId);
         // Not tied to a mod — like the launcher-update and connectivity items.
         Assert.True(string.IsNullOrEmpty(item.ModId));
+    }
+
+    // ---------- catalog patch notices (mods that are NOT installed) ----------
+    //
+    // The same spam rules as announcements, for the same reason, plus one of its own: this
+    // latch must never be shared with the installed-mod one.
+
+    /// <summary>
+    /// <b>The one that matters.</b> Without the seed, the first feed read bells a patch notice
+    /// for every mod in the catalog at once.
+    /// </summary>
+    [Fact]
+    public void CatalogPatches_FirstReadSeedsSilently_AndNothingBells()
+    {
+        var center = NewCenter(out var config);
+
+        Assert.True(center.SeedCatalogVersionBaseline(new Dictionary<string, string>
+        {
+            ["improvement-mod"] = "06.09.2026",
+            ["napoleonic-era"] = "2.1.7b",
+        }));
+
+        Assert.Empty(center.Items);
+        Assert.True(config.CatalogVersionBaselineSeeded);
+        Assert.Equal("06.09.2026", config.NotifiedCatalogVersions["improvement-mod"]);
+    }
+
+    [Fact]
+    public void CatalogPatches_SeedRunsOnce()
+    {
+        var center = NewCenter(out _);
+
+        Assert.True(center.SeedCatalogVersionBaseline(
+            new Dictionary<string, string> { ["improvement-mod"] = "06.09.2026" }));
+        Assert.False(center.SeedCatalogVersionBaseline(
+            new Dictionary<string, string> { ["napoleonic-era"] = "2.1.8" }));
+    }
+
+    [Fact]
+    public void CatalogPatches_AfterTheBaseline_ANewVersionBellsExactlyOnce()
+    {
+        var center = NewCenter(out _);
+        center.SeedCatalogVersionBaseline(
+            new Dictionary<string, string> { ["improvement-mod"] = "25.07.2026" });
+
+        Assert.True(center.RaiseModPatch("improvement-mod", "06.09.2026", "t", "b"));
+        Assert.False(center.RaiseModPatch("improvement-mod", "06.09.2026", "t", "b"));
+
+        Assert.Single(center.Items, i => i.Kind == NotificationKind.ModPatchPublished);
+    }
+
+    [Fact]
+    public void CatalogPatches_TheSeededVersionItselfNeverBells()
+    {
+        var center = NewCenter(out _);
+        center.SeedCatalogVersionBaseline(
+            new Dictionary<string, string> { ["improvement-mod"] = "06.09.2026" });
+
+        Assert.False(center.RaiseModPatch("improvement-mod", "06.09.2026", "t", "b"));
+        Assert.Empty(center.Items);
+    }
+
+    /// <summary>
+    /// An installed mod records its version but stays silent here: it bells through
+    /// RaiseUpdateAvailable instead. Leaving the entry stale would fire a patch notice the
+    /// moment the player uninstalled the mod.
+    /// </summary>
+    [Fact]
+    public void CatalogPatches_RecordOnly_UpdatesTheLatchWithoutBelling()
+    {
+        var center = NewCenter(out var config);
+        center.SeedCatalogVersionBaseline(
+            new Dictionary<string, string> { ["improvement-mod"] = "25.07.2026" });
+
+        Assert.False(center.RaiseModPatch("improvement-mod", "06.09.2026", "t", "b", record: false));
+
+        Assert.Empty(center.Items);
+        Assert.Equal("06.09.2026", config.NotifiedCatalogVersions["improvement-mod"]);
+    }
+
+    /// <summary>
+    /// The two latches are separate on purpose. Sharing one would let a patch notice swallow
+    /// the real update bell the day the player installs that mod.
+    /// </summary>
+    [Fact]
+    public void CatalogPatches_DoNotConsumeTheInstalledModsUpdateLatch()
+    {
+        var center = NewCenter(out _);
+        center.SeedCatalogVersionBaseline(
+            new Dictionary<string, string> { ["improvement-mod"] = "25.07.2026" });
+
+        Assert.True(center.RaiseModPatch("improvement-mod", "06.09.2026", "t", "b"));
+        // The player installs it, and the ordinary update path still has something to say.
+        Assert.True(center.RaiseUpdateAvailable("improvement-mod", "06.09.2026", "t", "b"));
+    }
+
+    [Fact]
+    public void CatalogPatches_AnEmptyVersionIsNoAnswer_AndNeverBells()
+    {
+        var center = NewCenter(out _);
+        center.SeedCatalogVersionBaseline(
+            new Dictionary<string, string> { ["improvement-mod"] = "25.07.2026" });
+
+        Assert.False(center.RaiseModPatch("improvement-mod", "", "t", "b"));
+        Assert.Empty(center.Items);
     }
 
     [Fact]

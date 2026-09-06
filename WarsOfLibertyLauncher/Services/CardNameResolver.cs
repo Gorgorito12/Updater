@@ -24,11 +24,21 @@ namespace WarsOfLibertyLauncher.Services;
 /// and they are the ONLY description the 20-odd crate and unit-shipment cards in a real deck
 /// have, since those carry no <c>RolloverTextID</c> at all.
 /// </param>
+/// <param name="NameMarkup">
+/// The name as the table WROTE it, colour span and all.
+///
+/// <para>Opt-in, and last, because <see cref="Name"/> is the safe default and every existing
+/// caller keeps getting it. Only a surface that can paint runs
+/// (<see cref="GameText.Fill"/>) has any business with this; anything that assigns a string
+/// takes <see cref="Name"/>, which has already been through <see cref="GameText.Clean"/>.
+/// Null when there is nothing extra in it.</para>
+/// </param>
 public sealed record CardDetail(
     string? Name,
     string? Description,
     string? IconPath,
-    IReadOnlyList<CardEffect>? Effects = null)
+    IReadOnlyList<CardEffect>? Effects = null,
+    string? NameMarkup = null)
 {
     /// <summary>Never null: a card with no effects has none, not an unknown number of them.</summary>
     public IReadOnlyList<CardEffect> EffectsOrEmpty => Effects ?? Array.Empty<CardEffect>();
@@ -129,11 +139,21 @@ public static class CardNameResolver
             strings.TryGetValue(tech.RolloverTextId, out var rollover);
 
             var description = GameText.Clean(rollover);
+
+            // The NAME goes through the cleaner too. It did not, and the community-cards
+            // table printed rows reading "10 Dragoons <color=1.0, 1.0, 0.0>+ 3 Hussars</color>"
+            // -- the same defect the descriptions had already been fixed for, one field over.
+            // Cleaned here rather than at each caller so a surface added tomorrow is safe by
+            // default; the raw form is kept alongside for the one table that paints it.
+            var cleanName = GameText.Clean(title);
+            var rawName = (title ?? "").Trim();
+
             result[name] = new CardDetail(
-                string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
+                cleanName.Length == 0 ? null : cleanName,
                 description.Length == 0 ? null : description,
                 tech.IconPath,
-                tech.Effects);
+                tech.Effects,
+                string.Equals(rawName, cleanName, StringComparison.Ordinal) ? null : rawName);
         }
 
         return result;

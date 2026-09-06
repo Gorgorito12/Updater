@@ -542,6 +542,11 @@
     <SolidColorBrush x:Key="MpNavTabIdle" Color="#A8BCD2"/>
     <SolidColorBrush x:Key="MpChipOkBg" Color="#2435C46F"/>
     <SolidColorBrush x:Key="MpChipOkRim" Color="#4D35C46F"/>
+    <!-- The same chip in the attention amber and in the failure red, at the same alpha,
+         so a state chip can change what it says without changing how loud it is.
+         MpCaution (#E6B455) and MpDestructiveText (#D99A9A) are the hues they tint. -->
+    <SolidColorBrush x:Key="MpChipCautionBg" Color="#24E6B455"/>
+    <SolidColorBrush x:Key="MpChipDangerBg" Color="#24D99A9A"/>
     <!-- Secondary text inside the OK chip (the VPN address). Deliberately a muted
          green-GREY rather than the saturated MpOkTextAlt: it sits beside the status
          word and must not compete with it. Taken from the prototype, which uses a

@@ -418,8 +418,14 @@
                                             <TextBlock x:Name="StayOnVersionTitle" Style="{StaticResource SetRowTitle}"/>
                                             <TextBlock x:Name="StayOnVersionHint" Style="{StaticResource SetRowDesc}"/>
                                         </StackPanel>
+                                        <!-- Click, not Checked/Unchecked: LoadGeneral sets
+                                             IsChecked programmatically, and those two events
+                                             would fire on it and write the pin back. This
+                                             handler existed and was wired to NOTHING, so the
+                                             switch wrote no state at all. -->
                                         <ToggleButton Grid.Column="1" x:Name="StayOnVersionCheck"
-                                                      Style="{StaticResource SetToggle}"/>
+                                                      Style="{StaticResource SetToggle}"
+                                                      Click="StayOnVersionCheck_Click"/>
                                     </Grid>
                                     <!-- The consequence, in the colour reserved for a warning
                                          that has one — not a grey paragraph nobody reads. -->

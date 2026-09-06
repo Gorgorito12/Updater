@@ -48,6 +48,29 @@ public static class Strings
     public static string Format(string key, params object?[] args) =>
         string.Format(Get(key), args);
 
+    /// <summary>
+    /// The value for a SPECIFIC language, ignoring <see cref="Language"/>.
+    ///
+    /// <para>For the one case <see cref="Get"/> cannot serve: a string that was once written
+    /// into data which OUTLIVES the session that wrote it. The room title is the example -
+    /// it is persisted on the lobby server, so recognising a title this launcher produced in
+    /// an earlier build means enumerating what it would have said in every language, not just
+    /// the one that happens to be selected now.</para>
+    /// </summary>
+    internal static string GetIn(string lang, string key)
+    {
+        if (Table.TryGetValue(key, out var langs))
+        {
+            if (langs.TryGetValue(lang, out var localized)) return localized;
+            if (langs.TryGetValue(LangEn, out var fallback)) return fallback;
+        }
+        return key;
+    }
+
+    /// <summary><see cref="GetIn"/> with <see cref="string.Format(string, object?[])"/>.</summary>
+    internal static string FormatIn(string lang, string key, params object?[] args) =>
+        string.Format(GetIn(lang, key), args);
+
     // ------------------------------------------------------------------------
     // String table: ordered roughly by where strings appear in the launcher.
     // Keep keys descriptive and stable — they're referenced from XAML/code.
@@ -1990,6 +2013,60 @@ public static class Strings
         {
             [LangEn] = "Couldn't check for updates. See the logs for details.",
             [LangEs] = "No se pudo buscar actualizaciones. Revisa los registros para más detalles.",
+        },
+        // --- Update-state panel (GENERAL). TITLE and BODY are two different sentences.
+        // They used to be the same one: the title was assigned once, unconditionally, to
+        // ModPropUpToDate, so the panel read "You're up to date." twice and stayed green
+        // over a mod with newer releases published. Every state below owns both halves.
+        ["ModPropUpToDateBody"] = new()
+        {
+            [LangEn] = "You have {0}, the latest published version.",
+            [LangEs] = "Tienes la {0}, la última versión publicada.",
+        },
+        ["ModPropUpdateAvailableTitle"] = new()
+        {
+            [LangEn] = "Update available",
+            [LangEs] = "Actualización disponible",
+        },
+        ["ModPropUpdateAvailableBody"] = new()
+        {
+            [LangEn] = "{0} has been published. You have {1}.",
+            [LangEs] = "Se ha publicado la {0}. Tú tienes la {1}.",
+        },
+        ["ModPropUpdateUnknownTitle"] = new()
+        {
+            [LangEn] = "Version not verified",
+            [LangEs] = "Versión sin verificar",
+        },
+        ["ModPropUpdateUnknownBody"] = new()
+        {
+            [LangEn] = "The mod is installed, but the launcher never recorded which version. Installing {0} will set it.",
+            [LangEs] = "El mod está instalado, pero el launcher nunca anotó qué versión es. Instalar la {0} lo dejará anotado.",
+        },
+        ["ModPropUpdatePausedTitle"] = new()
+        {
+            [LangEn] = "Updates paused",
+            [LangEs] = "Actualizaciones en pausa",
+        },
+        ["ModPropUpdatePausedBody"] = new()
+        {
+            [LangEn] = "{0} is published, but you chose to stay on {1}. Turn the switch below off to be offered it.",
+            [LangEs] = "Está publicada la {0}, pero elegiste quedarte en la {1}. Apaga el interruptor de abajo para que se te ofrezca.",
+        },
+        ["ModPropNotInstalledTitle"] = new()
+        {
+            [LangEn] = "Not installed",
+            [LangEs] = "Sin instalar",
+        },
+        ["ModPropCheckFailedTitle"] = new()
+        {
+            [LangEn] = "Couldn't check",
+            [LangEs] = "No se pudo comprobar",
+        },
+        ["ModPropCheckingTitle"] = new()
+        {
+            [LangEn] = "Checking…",
+            [LangEs] = "Comprobando…",
         },
         ["ModPropOpenAoE3Folder"] = new()
         {
@@ -4752,6 +4829,45 @@ public static class Strings
         // the profile's own deck section already owned — a dictionary initializer is indexer
         // assignment, so the later declaration won and this table silently rendered "Your
         // decks" over a community aggregate. Caught by NoKeyIsDeclaredTwice.
+        // --- The community-cards table, folded by civilization ---
+        // The census beside the section label. It states what the table HAS, and nothing
+        // beyond it: a claim about matches or players would be a different number that this
+        // route cannot support.
+        ["MpStatsDecksCardCount"] = new()
+        {
+            [LangEn] = "{0} distinct cards",
+            [LangEs] = "{0} cartas distintas",
+        },
+        ["MpStatsDecksCivCards"] = new()
+        {
+            [LangEn] = "{0} cards",
+            [LangEs] = "{0} cartas",
+        },
+        // Count and share in one cell. The share only appears when there is sample behind it;
+        // below the minimum the count goes in alone and nothing takes the percentage's place.
+        ["MpStatsDecksCountAndShare"] = new()
+        {
+            [LangEn] = "{0} \u00b7 {1} %",
+            [LangEs] = "{0} \u00b7 {1} %",
+        },
+        ["MpStatsTailDecks"] = new()
+        {
+            [LangEn] = "{0} more cards, seen once",
+            [LangEs] = "{0} cartas m\u00e1s, vistas una vez",
+        },
+        ["MpStatsTailDecksWhy"] = new()
+        {
+            [LangEn] = "A card somebody brought once says nothing about what the community "
+                     + "prefers, so those are summed up in one line instead of taking a row each.",
+            [LangEs] = "Una carta que alguien llev\u00f3 una sola vez no dice nada de lo que "
+                     + "prefiere la comunidad, as\u00ed que esas se resumen en una l\u00ednea en vez de "
+                     + "ocupar una fila cada una.",
+        },
+        ["MpStatsDecksMoreCivs"] = new()
+        {
+            [LangEn] = "{0} more civilizations",
+            [LangEs] = "{0} civilizaciones m\u00e1s",
+        },
         ["MpStatsCommunityDecksTitle"] = new()
         {
             [LangEn] = "Cards the community brings",
@@ -6757,6 +6873,11 @@ public static class Strings
             [LangEn] = "Pick a mod — the fingerprint is still being computed.",
             [LangEs] = "Elige un mod — la huella todavía se está calculando.",
         },
+        // KEPT FOR RECOGNITION ONLY - do not delete as unused. The proposed room title is a
+        // network value now and no longer localized (see RoomTitleProposal), but titles this
+        // key produced are still sitting in hosts' boxes and on the lobby server, and
+        // RoomTitleProposal.LegacyProposals has to be able to reproduce them or those boxes
+        // freeze. Same for MpRoomCompetitiveBadge, which is also still live in three badges.
         ["MpCreateDialogDefaultTitle"] = new()
         {
             [LangEn] = "{0} room",
@@ -7778,6 +7899,18 @@ public static class Strings
             [LangEs] = "Las funciones en línea vuelven a estar disponibles.",
         },
         // ---- Bell: new mod in the catalog ----
+        // A patch for a mod the player does NOT have installed. Worded so it cannot be
+        // mistaken for the update item: nothing here is waiting to be applied.
+        ["NotifModPatchTitle"] = new()
+        {
+            [LangEn] = "New patch published",
+            [LangEs] = "Nuevo parche publicado",
+        },
+        ["NotifModPatchBody"] = new()
+        {
+            [LangEn] = "{0} released {1}. You don't have this mod installed.",
+            [LangEs] = "{0} ha publicado la {1}. No tienes este mod instalado.",
+        },
         ["NotifNewModTitle"] = new()
         {
             [LangEn] = "New mod available",

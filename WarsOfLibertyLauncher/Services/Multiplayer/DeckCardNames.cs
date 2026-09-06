@@ -70,6 +70,34 @@ internal static class DeckCardNames
                 : internalName!;
         }
 
+        /// <summary>
+        /// The name as the mod's table wrote it, colour span included, for the one caller that
+        /// can paint it through <see cref="GameText.Fill"/>. Falls back to
+        /// <see cref="NameOf"/> - and therefore to the identifier - so a caller using this
+        /// never gets less than one using the plain name.
+        /// </summary>
+        internal string NameMarkupOf(string? internalName)
+        {
+            if (string.IsNullOrWhiteSpace(internalName)) return "";
+            return Cards.TryGetValue(internalName!, out var d)
+                && !string.IsNullOrWhiteSpace(d.NameMarkup)
+                    ? d.NameMarkup!
+                    : NameOf(internalName);
+        }
+
+        /// <summary>
+        /// What the card says it does, already cleaned. Null when the mod ships none - and a
+        /// card with no description is drawn as ABSENCE, never as a placeholder.
+        /// </summary>
+        internal string? DescriptionOf(string? internalName)
+        {
+            if (string.IsNullOrWhiteSpace(internalName)) return null;
+            return Cards.TryGetValue(internalName!, out var d)
+                && !string.IsNullOrWhiteSpace(d.Description)
+                    ? d.Description
+                    : null;
+        }
+
         internal ImageSource? IconOf(string? internalName)
         {
             if (string.IsNullOrWhiteSpace(internalName)) return null;

@@ -601,6 +601,22 @@ public enum NotificationKind
     /// looking: the bell carries the notice, and clicking it opens where the conversation is.</para>
     /// </summary>
     Announcement,
+
+    /// <summary>
+    /// A mod in the catalog published a new version — and this launcher does NOT have that
+    /// mod installed.
+    ///
+    /// <para><b>Why it is not <see cref="UpdateAvailable"/>.</b> That kind's wording says a
+    /// version "is available to download" for something you have, and clicking it takes you
+    /// to the update flow. Neither is true here: there is nothing installed to update. This
+    /// one says a mod you might care about shipped a patch, and clicking it opens that mod in
+    /// the Workshop. Sharing the kind would have made the bell lie about half its items.</para>
+    ///
+    /// <para>Deduped by <see cref="LauncherConfig.NotifiedCatalogVersions"/>, which is a
+    /// separate latch from <see cref="ModState.NotifiedUpdateVersion"/> so a mod that gets
+    /// installed later cannot have its first real update swallowed by a patch notice.</para>
+    /// </summary>
+    ModPatchPublished,
 }
 
 /// <summary>
@@ -1924,6 +1940,34 @@ public class LauncherConfig
     /// </summary>
     [JsonPropertyName("notifiedCatalogModIds")]
     public List<string> NotifiedCatalogModIds { get; set; } = new();
+
+    /// <summary>
+    /// The last version this launcher has ALREADY accounted for, per catalog mod id.
+    ///
+    /// <para>Feeds <see cref="NotificationKind.ModPatchPublished"/> — the patch notice for
+    /// mods that are not installed. Deliberately separate from
+    /// <see cref="ModState.NotifiedUpdateVersion"/>: that one belongs to the installed-mod
+    /// path, and sharing a latch would let a patch notice eat the update bell the day the
+    /// player installs that mod.</para>
+    ///
+    /// <para>Recorded for INSTALLED mods too, silently. They bell through the
+    /// update-available path instead, but keeping their entry current means uninstalling a
+    /// mod does not immediately produce a patch notice for a version already seen.</para>
+    ///
+    /// <para><see cref="CatalogVersionBaselineSeeded"/> tells "first ever read" apart from
+    /// "nothing published", which is the whole difference between a quiet first launch and
+    /// the entire catalog arriving at once.</para>
+    /// </summary>
+    [JsonPropertyName("notifiedCatalogVersions")]
+    public Dictionary<string, string> NotifiedCatalogVersions { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// True once <see cref="NotifiedCatalogVersions"/> has been baselined. Without it the
+    /// first feed read bells a patch notice for every mod in the catalog at once.
+    /// </summary>
+    [JsonPropertyName("catalogVersionBaselineSeeded")]
+    public bool CatalogVersionBaselineSeeded { get; set; }
 
     /// <summary>
     /// Announcement ids already belled, so one is never announced twice — across restarts, and
