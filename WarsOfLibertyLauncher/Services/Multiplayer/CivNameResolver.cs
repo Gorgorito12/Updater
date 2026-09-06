@@ -336,4 +336,112 @@ public static class CivNameResolver
 
         return id;
     }
+
+    /// <summary>
+    /// Each civilization's flag art path, by internal name. Empty when the mod keeps
+    /// <c>civs.xml</c> packed inside <c>Data.bar</c> — Improvement Mod and Napoleonic Era both
+    /// do, and they get no name from this file either, so no flag is the same ordinary state
+    /// and not a new fault.
+    ///
+    /// <para><b>A third pass rather than a third field in
+    /// <see cref="ReadNameAndDisplayId"/>.</b> That method carries an <c>advanced</c> flag
+    /// because <c>ReadElementContentAsString</c> leaves the reader past the element it read, and
+    /// its own remarks record that reading a second field is what made the bug certain. Adding a
+    /// third is exactly where it would break again, silently, and it would put the flag on the
+    /// path that decides a stored match's civilization. This one reads art and nothing else.</para>
+    ///
+    /// <para><b>Which element, and why not the others.</b> <c>&lt;portrait&gt;</c> first, then
+    /// <c>&lt;homecityflagtexture&gt;</c>: between them they cover 185 of Wars of Liberty's 187
+    /// civilizations and all 79 of Struggle of Indonesia's. NOT <c>&lt;bannertexture&gt;</c>,
+    /// which names a shared atlas and is meaningless without the
+    /// <c>&lt;bannertexturecoords&gt;</c> crop beside it, and not the
+    /// <c>&lt;portraittexture&gt;</c> nested inside <c>&lt;matchmakingtextures&gt;</c> — a
+    /// different picture, and at a different depth, which is why only direct children of the
+    /// <c>&lt;civ&gt;</c> block are considered.</para>
+    ///
+    /// <para>Reading the MOD's own art is what makes a reskin come out right: Struggle of
+    /// Indonesia's block named <c>Ottomans</c> ships its own flag, so Surakarta gets Surakarta's.</para>
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> ResolvePortraits(string? installPath)
+    {
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(installPath)) return byName;
+
+        var civsPath = Path.Combine(installPath!, "data", "civs.xml");
+        if (!File.Exists(civsPath)) return byName;
+
+        try
+        {
+            using var stream = File.OpenRead(civsPath);
+            using var reader = XmlReader.Create(stream, ModStringTable.Settings());
+
+            while (reader.Read())
+            {
+                if (reader.NodeType != XmlNodeType.Element) continue;
+                if (reader.Depth != 1) continue;
+                if (!string.Equals(reader.Name, "civ", StringComparison.OrdinalIgnoreCase)) continue;
+                if (byName.Count >= MaxCivs) break;
+
+                var pair = ReadNameAndPortrait(reader);
+                if (pair.Name != null && pair.Art != null) byName[pair.Name] = pair.Art;
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Write(
+                $"CivNameResolver: could not read portraits from '{civsPath}' — {ex.Message}");
+            return byName;
+        }
+
+        return byName;
+    }
+
+    /// <summary>
+    /// The internal name and flag art path of the civ element the reader is on, consuming
+    /// exactly that element.
+    ///
+    /// <para>Same <c>advanced</c> shape as <see cref="ReadNameAndDisplayId"/>, and for the same
+    /// reason — see its remarks. The depth check is what keeps
+    /// <c>&lt;matchmakingtextures&gt;/&lt;portraittexture&gt;</c> out: only direct children of
+    /// the civ block count.</para>
+    /// </summary>
+    private static (string? Name, string? Art) ReadNameAndPortrait(XmlReader reader)
+    {
+        if (reader.IsEmptyElement) return (null, null);
+
+        var depth = reader.Depth;
+        string? name = null;
+        string? portrait = null;
+        string? flag = null;
+        var advanced = false;
+
+        while (advanced || reader.Read())
+        {
+            advanced = false;
+
+            if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == depth) break;
+            if (reader.NodeType != XmlNodeType.Element || reader.IsEmptyElement) continue;
+            if (reader.Depth != depth + 1) continue;
+
+            var isName = name == null
+                && string.Equals(reader.Name, "name", StringComparison.OrdinalIgnoreCase);
+            var isPortrait = portrait == null
+                && string.Equals(reader.Name, "portrait", StringComparison.OrdinalIgnoreCase);
+            var isFlag = flag == null
+                && string.Equals(reader.Name, "homecityflagtexture", StringComparison.OrdinalIgnoreCase);
+            if (!isName && !isPortrait && !isFlag) continue;
+
+            var text = reader.ReadElementContentAsString().Trim();
+            if (text.Length > 0)
+            {
+                if (isName) name = text;
+                else if (isPortrait) portrait = text;
+                else flag = text;
+            }
+
+            advanced = true;
+        }
+
+        return (name, portrait ?? flag);
+    }
 }

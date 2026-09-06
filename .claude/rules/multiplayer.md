@@ -4851,6 +4851,35 @@ parameter is absent, so an older launcher receives exactly what it always did.
   set. The default-open group is chosen ONCE (`_deckCivsSeeded`) - re-deciding it per repaint
   would slam shut a group that had just been opened.
 
+- **A CARD'S DESCRIPTION IS BUILT, NOT READ, AND MOST CARDS HAVE NO WRITTEN ONE.** Reading
+  `CardDetail.Description` alone showed nothing at all for most of the table: every unit
+  shipment and crate carries no `RolloverTextID`, so the sentence is null and the figures live
+  only in the card's `<Effect>` blocks. `DeckCardNames.ResolveAsync` therefore calls
+  `CardEffectRenderer.RenderAll` inside its own background block - it already holds the install
+  path and the game executable there, and that call must never run on the UI thread.
+  `Vocabulary.DescriptionLinesOf` returns the modder's sentence and then the effect lines:
+  **two independent blocks, not a fallback**, because a card can carry either, both or neither,
+  and treating the effects as a fallback would hide them on the cards that carry both.
+  ⚠ **A row with no lines is NOT a button.** The engine has no wording for an effect aimed at
+  the player, so a crate genuinely says nothing beyond its own name, and a caret that opens onto
+  nothing is a promise the data cannot keep.
+  `THE_PROMISE_ONE_ADeckRowIsClickableOnlyWhenItHasSomethingToSay` pins it.
+
+- **THE CIVILIZATION'S FLAG COMES FROM THE MOD'S OWN ART, AND SO DOES ITS NAME.**
+  `CivNameResolver.ResolvePortraits` reads `<portrait>` (falling back to
+  `<homecityflagtexture>`) out of the same `civs.xml` the name already comes from, and
+  `CardArtService` - which is not card-specific - decodes it. NOT `<bannertexture>`, a shared
+  atlas meaningless without its `<bannertexturecoords>` crop, and not the `<portraittexture>`
+  nested inside `<matchmakingtextures>`, which is a different picture: only DIRECT children of
+  the `<civ>` block count. A separate pass reads them rather than a third field inside
+  `ReadNameAndDisplayId`, whose `advanced` flag already records what adding a second one cost.
+  Reading the mod's own art is what makes a reskin right - SoI's block named `Ottomans` ships
+  Surakarta's flag. Which is also why **the balance and matchup tables now resolve the civ
+  NAME** instead of printing the server's string: putting Surakarta's flag beside the word
+  "Ottomans" would have turned a latent error into an obvious one.
+  Absence is ordinary: one real WoL portrait path names a file that does not exist, and the two
+  mods that keep `civs.xml` inside `Data.bar` get no flag and no name, exactly as before.
+
 ---
 
 ## TOURNAMENTS

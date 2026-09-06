@@ -140,6 +140,102 @@ public class DeckCardNamesTests
         Assert.Equal("Americans", vocabulary.CivOf("Americans"));
     }
 
+    // ---------- what a card SAYS ----------
+    //
+    // The table showed no description at all until this existed, and the reason was in the
+    // data rather than the layout: every unit shipment and crate carries no RolloverTextID, so
+    // the modder's sentence is null for most of a real table and the description with the
+    // numbers has to be BUILT from the card's effects instead.
+
+    private static DeckCardNames.Vocabulary WithLines(
+        string? sentence, params string[] effects)
+        => new(
+            new Dictionary<string, CardDetail>(StringComparer.Ordinal)
+            {
+                ["HCXPRefrigeration"] = new CardDetail(
+                    "Refrigeration", string.IsNullOrEmpty(sentence) ? null : sentence, null),
+            },
+            new Dictionary<string, System.Windows.Media.ImageSource>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            effects.Length == 0
+                ? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+                : new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+                {
+                    ["HCXPRefrigeration"] = effects,
+                });
+
+    /// <summary>
+    /// THE ONE THAT MATTERS. Both halves, in order — the modder's own sentence first, then the
+    /// effects with their figures.
+    ///
+    /// <para>They are two independent blocks and NOT a fallback: a card can carry either, both
+    /// or neither, and the deck detail panel has always drawn them that way. Treating the
+    /// effects as a fallback would hide them on exactly the cards that carry both.</para>
+    /// </summary>
+    [Fact]
+    public void THE_ONE_THAT_MATTERS_TheSentenceAndTheEffectsBothAppearInOrder()
+        => Assert.Equal(
+            new[]
+            {
+                "Trading Posts are cheaper and stronger.",
+                "Trading Post: Changes Wood cost by -20.00%",
+            },
+            WithLines(
+                "Trading Posts are cheaper and stronger.",
+                "Trading Post: Changes Wood cost by -20.00%")
+                .DescriptionLinesOf("HCXPRefrigeration"));
+
+    /// <summary>
+    /// The case that made the table look empty: no sentence, but effects that describe it
+    /// perfectly well. Reading only <c>Description</c> returned nothing here.
+    /// </summary>
+    [Fact]
+    public void ACardWithNoSentenceStillDescribesItselfThroughItsEffects()
+        => Assert.Equal(
+            new[] { "Delivers 10 Cheriks" },
+            WithLines(null, "Delivers 10 Cheriks").DescriptionLinesOf("HCXPRefrigeration"));
+
+    [Fact]
+    public void ACardWithNoEffectsStillShowsTheSentence()
+        => Assert.Equal(
+            new[] { "Trading Posts are cheaper and stronger." },
+            WithLines("Trading Posts are cheaper and stronger.")
+                .DescriptionLinesOf("HCXPRefrigeration"));
+
+    /// <summary>
+    /// Neither is an ORDINARY answer, not a failure. A crate's effect targets the player and
+    /// the engine has no wording for that, so the card genuinely says nothing beyond its own
+    /// name — and the row that gets this must not offer to expand.
+    /// </summary>
+    [Fact]
+    public void ACardWithNeitherSaysNothingRatherThanSomethingInvented()
+        => Assert.Empty(WithLines(null).DescriptionLinesOf("HCXPRefrigeration"));
+
+    [Fact]
+    public void AVocabularyWithNoEffectsAtAllIsNotAnError()
+    {
+        // Three positional arguments: what the tests below build, and what the older callers
+        // build. The two new members are optional precisely so this keeps working.
+        var vocabulary = new DeckCardNames.Vocabulary(
+            new Dictionary<string, CardDetail>(StringComparer.Ordinal)
+            {
+                ["HCXPRefrigeration"] = new CardDetail("Refrigeration", "A sentence.", null),
+            },
+            new Dictionary<string, System.Windows.Media.ImageSource>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.Ordinal));
+
+        Assert.Equal(new[] { "A sentence." }, vocabulary.DescriptionLinesOf("HCXPRefrigeration"));
+        Assert.Null(vocabulary.CivIconOf("Mexicans"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("SomethingElse")]
+    public void AnUnknownCardSaysNothing(string? card)
+        => Assert.Empty(WithLines("A sentence.", "An effect.").DescriptionLinesOf(card));
+
     [Fact]
     public void ACardWithNoNameFallsBackInsteadOfDrawingBlank()
     {

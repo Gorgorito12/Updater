@@ -37,10 +37,23 @@ namespace WarsOfLibertyLauncher.Services.Multiplayer;
 internal static class DeckCardNames
 {
     /// <summary>What one mod's card vocabulary came to.</summary>
+    /// <param name="Effects">
+    /// The card's effects already rendered into sentences, from
+    /// <see cref="CardEffectRenderer.RenderAll"/> — the description with the NUMBERS in it.
+    /// A card that has nothing describable is simply absent.
+    /// </param>
+    /// <param name="CivIcons">The civilization's flag, keyed by internal name.</param>
+    /// <remarks>
+    /// Both are optional and LAST on purpose: the tests build a <c>Vocabulary</c> by hand with
+    /// three positional arguments, and a required member in the middle would break them without
+    /// saying anything about the behaviour that actually matters.
+    /// </remarks>
     internal sealed record Vocabulary(
         IReadOnlyDictionary<string, CardDetail> Cards,
         IReadOnlyDictionary<string, ImageSource> Icons,
-        IReadOnlyDictionary<string, string> Civs)
+        IReadOnlyDictionary<string, string> Civs,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? Effects = null,
+        IReadOnlyDictionary<string, ImageSource>? CivIcons = null)
     {
         /// <summary>An empty answer: the mod is not installed, or its files gave nothing.</summary>
         internal static readonly Vocabulary None = new(
@@ -96,6 +109,50 @@ internal static class DeckCardNames
                 && !string.IsNullOrWhiteSpace(d.Description)
                     ? d.Description
                     : null;
+        }
+
+        /// <summary>
+        /// Everything the mod says about a card: the modder's own sentence when it wrote one,
+        /// then the effects with their numbers.
+        ///
+        /// <para><b>Two blocks, not a fallback.</b> They answer different questions and a card
+        /// can have either, both or neither — the same shape the deck detail panel already
+        /// uses. Most of a real table has no <c>RolloverTextID</c> at all (every unit shipment
+        /// and crate), which is exactly why reading only the sentence showed nothing.</para>
+        ///
+        /// <para>Empty is an ordinary answer, not a failure: the engine has no wording for an
+        /// effect whose target is the player, so a crate genuinely says nothing beyond its own
+        /// name. The caller draws that as absence.</para>
+        /// </summary>
+        internal IReadOnlyList<string> DescriptionLinesOf(string? internalName)
+        {
+            if (string.IsNullOrWhiteSpace(internalName)) return Array.Empty<string>();
+
+            var lines = new List<string>();
+
+            if (Cards.TryGetValue(internalName!, out var d)
+                && !string.IsNullOrWhiteSpace(d.Description))
+            {
+                lines.Add(d.Description!);
+            }
+
+            if (Effects != null
+                && Effects.TryGetValue(internalName!, out var rendered)
+                && rendered != null)
+            {
+                lines.AddRange(rendered);
+            }
+
+            return lines;
+        }
+
+        /// <summary>The civilization's flag, or null when the mod ships none for it — which is
+        /// ordinary: one WoL portrait path names a file that does not exist, and a mod that
+        /// keeps <c>civs.xml</c> inside <c>Data.bar</c> resolves nothing at all.</summary>
+        internal ImageSource? CivIconOf(string? internalName)
+        {
+            if (string.IsNullOrWhiteSpace(internalName) || CivIcons == null) return null;
+            return CivIcons.TryGetValue(internalName!, out var icon) ? icon : null;
         }
 
         internal ImageSource? IconOf(string? internalName)
@@ -171,14 +228,30 @@ internal static class DeckCardNames
                 var icons = CardArtService.Load(
                     installPath, details.Values.Select(d => d.IconPath));
 
+                // The description with the numbers. It is BUILT, not read: the game stores the
+                // figures in the card's <Effect> blocks and prints them through printf
+                // templates in the mod's own string table. Both arguments this needs are
+                // already here, and this is already off the UI thread, which it must be.
+                var effects = CardEffectRenderer.RenderAll(
+                    installPath, profile.GameExecutable, details);
+
                 var civNames = new Dictionary<string, string>(StringComparer.Ordinal);
+                var civArt = new Dictionary<string, string>(StringComparer.Ordinal);
+                var portraits = CivNameResolver.ResolvePortraits(installPath);
                 foreach (var civ in wantedCivs)
                 {
                     var name = CivNameResolver.ResolveByInternalName(installPath, civ);
                     if (!string.IsNullOrWhiteSpace(name)) civNames[civ] = name!;
+                    if (portraits.TryGetValue(civ, out var art) && !string.IsNullOrWhiteSpace(art))
+                        civArt[civ] = art;
                 }
 
-                return new Vocabulary(details, icons, civNames);
+                var civIcons = CardArtService.Load(installPath, civArt.Values);
+                var civFlags = new Dictionary<string, ImageSource>(StringComparer.Ordinal);
+                foreach (var (civ, art) in civArt)
+                    if (civIcons.TryGetValue(art, out var flag)) civFlags[civ] = flag;
+
+                return new Vocabulary(details, icons, civNames, effects, civFlags);
             }).ConfigureAwait(true);
 
             // An empty answer is NOT cached: the mod may simply not be installed yet, and

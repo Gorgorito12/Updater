@@ -844,7 +844,14 @@ public class DialogXamlTests
             Assert.Equal(CivTableLayout.All.Count, grid.ColumnDefinitions.Count);
 
             var cells = grid.Children.OfType<TextBlock>().ToList();
-            Assert.Equal("Chinese", RevealText.PlainTextOf(cells.Single(t => Grid.GetColumn(t) == 0)));
+
+            // Column 0 is a PANEL, not a TextBlock: the civilization's flag sits beside its
+            // name inside that one cell, so the table's shared column contract stays untouched.
+            // Read through it rather than pinning the shape, which is not what this test is for.
+            var nameCell = grid.Children.OfType<FrameworkElement>().Single(e => Grid.GetColumn(e) == 0);
+            Assert.Equal("Chinese", RevealText.PlainTextOf(
+                VisualsUnder(nameCell).OfType<TextBlock>().First()));
+
             Assert.Equal($"{wins}-{losses}",
                 RevealText.PlainTextOf(cells.Single(t => Grid.GetColumn(t) == 2)));
 
@@ -2078,6 +2085,81 @@ public class DialogXamlTests
         });
         Assert.Null(error);
     }
+
+    /// <summary>
+    /// THE PROMISE ONE. A card row offers to expand only when the mod actually says something
+    /// about it.
+    ///
+    /// <para>Roughly half of a real table is unit shipments and crates. They carry no
+    /// <c>RolloverTextID</c>, and the engine has no wording for an effect aimed at the player,
+    /// so there is genuinely nothing to show — and a caret that opens onto nothing is a promise
+    /// the data cannot keep. Those rows stay inert; the ones with something to say become
+    /// buttons.</para>
+    /// </summary>
+    [Fact]
+    public void THE_PROMISE_ONE_ADeckRowIsClickableOnlyWhenItHasSomethingToSay()
+    {
+        var error = RunOnStaThread(() =>
+        {
+            EnsureResources();
+
+            var row = new DeckCardRow("HCXPRefrigeration", "Refrigeration", 3, null);
+
+            // Nothing to say: no button, no caret.
+            var silent = Laid(MultiplayerTab.BuildDeckCardRow(row, VocabularyWith()));
+            Assert.IsNotType<Button>(silent);
+            Assert.DoesNotContain(VisualsUnder(silent).OfType<TextBlock>(),
+                t => (t.Text ?? "").Contains('\u25b8') || (t.Text ?? "").Contains('\u25be'));
+
+            // Something to say: a button, and a closed caret.
+            var speaking = Laid(MultiplayerTab.BuildDeckCardRow(
+                row, VocabularyWith("Delivers 10 Cheriks"), open: false, onToggle: () => { }));
+            Assert.IsType<Button>(speaking);
+            Assert.Contains(VisualsUnder(speaking).OfType<TextBlock>(),
+                t => (t.Text ?? "").Contains('\u25b8'));
+
+            // Closed, the text is not on screen; opened, it is. That is the whole feature.
+            Assert.DoesNotContain(VisualsUnder(speaking).OfType<TextBlock>(),
+                t => (t.Text ?? "").Contains("Delivers 10 Cheriks"));
+
+            var opened = Laid(MultiplayerTab.BuildDeckCardRow(
+                row, VocabularyWith("Delivers 10 Cheriks"), open: true, onToggle: () => { }));
+            Assert.Contains(VisualsUnder(opened).OfType<TextBlock>(),
+                t => (t.Text ?? "").Contains("Delivers 10 Cheriks"));
+            Assert.Contains(VisualsUnder(opened).OfType<TextBlock>(),
+                t => (t.Text ?? "").Contains('\u25be'));
+        });
+        Assert.Null(error);
+    }
+
+    /// <summary>
+    /// Lays an element out before its visual tree is walked. A freshly built control has no
+    /// visual children until it is measured, so an assertion over them would pass for the
+    /// wrong reason - by finding nothing at all.
+    /// </summary>
+    private static FrameworkElement Laid(FrameworkElement element)
+    {
+        element.Measure(new Size(760, double.PositiveInfinity));
+        element.Arrange(new Rect(0, 0, 760, element.DesiredSize.Height));
+        element.UpdateLayout();
+        return element;
+    }
+
+    /// <summary>A vocabulary whose single card says exactly these lines.</summary>
+    private static DeckCardNames.Vocabulary VocabularyWith(params string[] lines)
+        => new(
+            new Dictionary<string, CardDetail>(StringComparer.Ordinal)
+            {
+                ["HCXPRefrigeration"] = new CardDetail("Refrigeration", null, null),
+            },
+            new Dictionary<string, System.Windows.Media.ImageSource>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            lines.Length == 0
+                ? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+                : new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+                {
+                    ["HCXPRefrigeration"] = lines,
+                });
 
     /// <summary>
     /// THE SYMMETRY ONE. The status column starts at the same x on every row of a card, and
@@ -3886,7 +3968,16 @@ public class DialogXamlTests
             });
             var thinText = TextIn(thin).Select(t => t.Text ?? "").ToList();
 
-            Assert.Contains(thinText, t => t.Contains("Chinese") && t.Contains("Ottomans"));
+            // The pair is built from parts now - a flag can sit beside each civilization - so
+            // the two names are separate runs. What still has to hold is the ORDER: the record
+            // beside them belongs to the FIRST, and "B vs A" with A's record is the same
+            // numbers meaning the opposite.
+            var thinPair = string.Join(" ", thinText);
+            Assert.Contains("Chinese", thinPair);
+            Assert.Contains("Ottomans", thinPair);
+            Assert.True(thinPair.IndexOf("Chinese", System.StringComparison.Ordinal)
+                        < thinPair.IndexOf("Ottomans", System.StringComparison.Ordinal),
+                $"the pair reads '{thinPair}' - the first civilization must come first.");
             Assert.Contains("1-0", thinText);
             Assert.DoesNotContain(thinText, t => t.Contains("%"));
             // Not an em dash and not a zero either — the cell is simply empty.
