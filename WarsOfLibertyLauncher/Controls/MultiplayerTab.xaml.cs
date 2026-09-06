@@ -8876,7 +8876,7 @@ public partial class MultiplayerTab : UserControl
         // Lower-case words that wrap under the figure - "players in 7 days" - so prose, not a
         // tag. It stays well under the 15 of the number it belongs to either way.
         label.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
-        label.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        label.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         cell.Children.Add(label);
 
         host.Children.Add(cell);
@@ -8938,7 +8938,7 @@ public partial class MultiplayerTab : UserControl
         {
             var extra = new TextBlock { Text = trailing, VerticalAlignment = VerticalAlignment.Bottom };
             extra.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-            extra.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+            extra.SetResourceReference(TextBlock.ForegroundProperty, "MpTextLabel");
             Grid.SetColumn(extra, 1);
             row.Children.Add(extra);
         }
@@ -8955,7 +8955,7 @@ public partial class MultiplayerTab : UserControl
             Margin = new Thickness(1, 0, 1, 16),
         };
         note.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
-        note.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        note.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         return note;
     }
 
@@ -9151,7 +9151,7 @@ public partial class MultiplayerTab : UserControl
         };
         // Names, not a tag. Same rung as the rest of this page's prose.
         names.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
-        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         words.Children.Add(names);
 
         Grid.SetColumn(words, 0);
@@ -9166,7 +9166,7 @@ public partial class MultiplayerTab : UserControl
         };
         total.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         total.SetResourceReference(TextBlock.FontSizeProperty, "MpFigureSize");
-        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         Grid.SetColumn(total, 1);
         grid.Children.Add(total);
 
@@ -9806,7 +9806,7 @@ public partial class MultiplayerTab : UserControl
         };
         // A whole sentence. Same rung as the footnote that says the same kind of thing.
         why.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
-        why.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        why.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         words.Children.Add(why);
 
         Grid.SetColumn(words, 0);
@@ -9820,7 +9820,7 @@ public partial class MultiplayerTab : UserControl
         };
         total.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         total.SetResourceReference(TextBlock.FontSizeProperty, "MpFigureSize");
-        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         Grid.SetColumn(total, 1);
         grid.Children.Add(total);
 
@@ -10435,7 +10435,7 @@ public partial class MultiplayerTab : UserControl
         };
         count.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         count.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-        count.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        count.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         grid.Children.Add(WithColumn(count, 3));
 
         // The whole header is the hit target, not the caret. A four-pixel triangle is not a
@@ -10564,7 +10564,7 @@ public partial class MultiplayerTab : UserControl
                 // uppercase inside a chip". These are wrapping sentences, and they were coming
                 // out smaller than the footnotes that explain the table above them.
                 block.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
-                block.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+                block.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
                 block.Margin = new Thickness(0, 0, 0, 3);
                 text.Children.Add(block);
             }
@@ -10651,7 +10651,7 @@ public partial class MultiplayerTab : UserControl
         };
         // Names, not a tag. Same rung as the rest of this page's prose.
         names.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
-        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         words.Children.Add(names);
 
         grid.Children.Add(WithColumn(words, 0));
@@ -10665,7 +10665,7 @@ public partial class MultiplayerTab : UserControl
         };
         total.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         total.SetResourceReference(TextBlock.FontSizeProperty, "MpFigureSize");
-        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         grid.Children.Add(WithColumn(total, 1));
 
         var seeAll = new Button
