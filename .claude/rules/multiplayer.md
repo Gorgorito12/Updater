@@ -328,18 +328,36 @@ the `config.GameExecutable` shared-exe trap, the notification bell + new-room po
   a record of something that happened, stamped with when; translating it later would be
   rewriting the past.
 
+- **THE ROOM TITLE IS A NETWORK VALUE, NOT UI COPY. IT DOES NOT GO THROUGH `Strings.cs` AND IT
+  DOES NOT CHANGE WITH THE HOST'S LANGUAGE.** It is typed into `CreateLobbyRequest.Title`,
+  persisted on the lobby server, and rendered verbatim to everyone who opens the browser. So
+  the badge beside it can be localized per viewer and the title never can: composing it from
+  the string table meant a Spanish host published `Sala de WoL \u00b7 COMPETITIVA 2v2` and an
+  English player read exactly that. The two markers - `Ranked` and `Casual` - are `const`
+  fields in `RoomTitleProposal`, and putting them in `Strings.cs` is the defect, not the fix.
+  Everyone sees `WoL \u00b7 Ranked 2v2`. The format labels are read with
+  `Strings.GetIn(LangEn, ...)` rather than `Get`, so localizing `MpFormat2v2` later cannot
+  quietly put a translated word back onto the wire.
+  `TheTitleIsTheSameInEveryLanguage` is the pin, and it has to exist because nothing on the
+  host's own screen would ever look wrong.
+
 - **THE PROPOSED ROOM TITLE SAYS THE FORMAT, AND `RoomTitleProposal.IsOurs` IS THE PART THAT
-  BREAKS SILENTLY.** A competitive room is proposed as `Sala de {mod} \u00b7 COMPETITIVA 2v2`, with
-  the format the host actually picked - 1v1, 2v2 or 3v3, from `RoomFormats.LabelKey`, the same
-  source the browser row's chip uses so a room and its own row cannot disagree. `Unknown` says
-  only the badge; inventing a 1v1 there would be a lie. Composed from strings that already
-  existed, so it follows the launcher's language for free.
+  BREAKS SILENTLY.** A competitive room is proposed as `{mod} \u00b7 Ranked 2v2`, with the format
+  the host actually picked - 1v1, 2v2 or 3v3, from `RoomFormats.LabelKey`, the same source the
+  browser row's chip uses so a room and its own row cannot disagree. `Unknown` says only the
+  marker; inventing a 1v1 there would be a lie.
   The dialog only ever rewrites a title it recognises as its own, so **`IsOurs` must enumerate
   every variant it can produce** - each mod \u00d7 {casual, competitive \u00d7 1v1/2v2/3v3/Unknown}. Miss
   one and there is nothing to see: the box simply stops updating, because the first competitive
   title it wrote now reads as a name the host typed. `EveryTitleWeWriteIsOneWeRecogniseAgain`
   walks the generated list rather than a restated one, so a new variant is covered the day it
   is added.
+  \u26a0 **`LegacyProposals` is the same trap reached through an upgrade, and it is why
+  `MpCreateDialogDefaultTitle` and `MpRoomCompetitiveBadge` must not be deleted.** A host whose
+  box still holds `Sala de WoL \u00b7 COMPETITIVA 1v1` from an older build would find the field
+  frozen forever with nothing to explain it. Both languages are enumerated, not just the
+  active one: switching the launcher's language does not rewrite a title already on the
+  server. Recognition only - `AllProposals` stays the answer to "what would this class write".
   \u26a0 **The word appears twice on a browser row, and that was weighed, not overlooked.** The
   gold chip stays derived from the SERVER's boolean - its own comment says why, and it still
   holds: anyone can type "competitiva" into a room name, and a badge a stranger can forge is

@@ -48,6 +48,29 @@ public static class Strings
     public static string Format(string key, params object?[] args) =>
         string.Format(Get(key), args);
 
+    /// <summary>
+    /// The value for a SPECIFIC language, ignoring <see cref="Language"/>.
+    ///
+    /// <para>For the one case <see cref="Get"/> cannot serve: a string that was once written
+    /// into data which OUTLIVES the session that wrote it. The room title is the example -
+    /// it is persisted on the lobby server, so recognising a title this launcher produced in
+    /// an earlier build means enumerating what it would have said in every language, not just
+    /// the one that happens to be selected now.</para>
+    /// </summary>
+    internal static string GetIn(string lang, string key)
+    {
+        if (Table.TryGetValue(key, out var langs))
+        {
+            if (langs.TryGetValue(lang, out var localized)) return localized;
+            if (langs.TryGetValue(LangEn, out var fallback)) return fallback;
+        }
+        return key;
+    }
+
+    /// <summary><see cref="GetIn"/> with <see cref="string.Format(string, object?[])"/>.</summary>
+    internal static string FormatIn(string lang, string key, params object?[] args) =>
+        string.Format(GetIn(lang, key), args);
+
     // ------------------------------------------------------------------------
     // String table: ordered roughly by where strings appear in the launcher.
     // Keep keys descriptive and stable — they're referenced from XAML/code.
@@ -6811,6 +6834,11 @@ public static class Strings
             [LangEn] = "Pick a mod — the fingerprint is still being computed.",
             [LangEs] = "Elige un mod — la huella todavía se está calculando.",
         },
+        // KEPT FOR RECOGNITION ONLY - do not delete as unused. The proposed room title is a
+        // network value now and no longer localized (see RoomTitleProposal), but titles this
+        // key produced are still sitting in hosts' boxes and on the lobby server, and
+        // RoomTitleProposal.LegacyProposals has to be able to reproduce them or those boxes
+        // freeze. Same for MpRoomCompetitiveBadge, which is also still live in three badges.
         ["MpCreateDialogDefaultTitle"] = new()
         {
             [LangEn] = "{0} room",
