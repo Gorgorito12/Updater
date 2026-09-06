@@ -86,6 +86,13 @@ public partial class ModPropertiesDialog : Window
     /// </summary>
     private readonly Func<IReadOnlyList<ModProfile>>? _listSettingsSources;
 
+    /// <summary>
+    /// The check result the main window already has cached, WITHOUT forcing a new one.
+    /// The panel used to be a decoration that only came alive if you pressed "Check";
+    /// opening the dialog now paints the real state from what is already known.
+    /// </summary>
+    private readonly Func<UpdateService.CheckResult?>? _lastCheckResult;
+
     // Fase 1 — version picker (GitHubReleases mods only). Null for other
     // mechanisms, which hides the whole "Version" section.
     private readonly Func<Task<IReadOnlyList<GitHubReleaseDownloader.ReleaseInfo>>>? _listVersions;
@@ -124,7 +131,8 @@ public partial class ModPropertiesDialog : Window
         Action<string>? removeInstall = null,
         Func<bool>? addExistingFolder = null,
         Action? searchInstall = null,
-        Func<IReadOnlyList<ModProfile>>? listSettingsSources = null)
+        Func<IReadOnlyList<ModProfile>>? listSettingsSources = null,
+        Func<UpdateService.CheckResult?>? lastCheckResult = null)
     {
         _profile = profile;
         _service = service;
@@ -154,6 +162,7 @@ public partial class ModPropertiesDialog : Window
         _addExistingFolder = addExistingFolder;
         _searchInstall = searchInstall;
         _listSettingsSources = listSettingsSources;
+        _lastCheckResult = lastCheckResult;
 
         InitializeComponent();
         ApplyStrings();
@@ -212,7 +221,9 @@ public partial class ModPropertiesDialog : Window
         LblVersion.Text = Strings.Get("ModPropInstalledLabel");
         StayOnVersionTitle.Text = Strings.Get("ModPropStayOnVersionShort");
         StayOnVersionWarning.Text = Strings.Get("ModPropStayOnVersionWarn");
-        UpdateStateTitle.Text = Strings.Get("ModPropUpToDate");
+        // NOT set here any more. The title is a VERDICT, and assigning it once
+        // unconditionally is what made this panel claim "You're up to date." over a mod
+        // with three newer releases published. RefreshUpdateState() owns it.
         CheckUpdatesBtn.Content = Strings.Get("BtnCheck");
         SetTip(CheckUpdatesBtn, "TooltipMenuCheckForUpdates");
         StayOnVersionHint.Text = Strings.Get("ModPropStayOnVersionHint");
@@ -401,6 +412,23 @@ public partial class ModPropertiesDialog : Window
             StayOnVersionCheck.Visibility = Visibility.Collapsed;
             StayOnVersionHint.Visibility = Visibility.Collapsed;
         }
+
+        // The update-state panel is a VERDICT and is painted from what the main window
+        // already knows, with no network call. Doing this on open is the point: the panel
+        // used to come alive only if you pressed "Check", so the dialog opened claiming a
+        // state it had never looked at.
+        //
+        // The stock game is detect-only - the launcher never tracks its version by design -
+        // so the whole card goes rather than a card with nothing to say.
+        if (_profile.IsStockGame)
+        {
+            UpdateStateCard.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            UpdateStateCard.Visibility = Visibility.Visible;
+            RefreshUpdateState();
+        }
     }
 
     /// <summary>
@@ -420,6 +448,9 @@ public partial class ModPropertiesDialog : Window
                 : "";
         _config.Save();
         _onUpdatePolicyChanged?.Invoke();
+        // The pin decides between "update available" and "updates paused", so the panel is
+        // now stale. Repaint from the cached result - still no network call.
+        RefreshUpdateState();
     }
 
     /// <summary>
@@ -1531,7 +1562,7 @@ public partial class ModPropertiesDialog : Window
         if (_checkForUpdates == null) return;
 
         CheckUpdatesBtn.IsEnabled = false;
-        SetCheckResult(Strings.Get("ModPropChecking"), "TextSecondary");
+        SetCheckingState();
         try
         {
             var result = await _checkForUpdates();
@@ -1540,32 +1571,17 @@ public partial class ModPropertiesDialog : Window
             // newly-detected install / version.
             LoadGeneral();
 
-            if (result == null || !result.IsValidInstall)
-            {
-                SetCheckResult(Strings.Get("ModPropCheckNotInstalled"), "TextSecondary");
-            }
-            else if (result.CurrentVersion == null)
-            {
-                // Valid install we couldn't identify (stale/unreachable UpdateInfo).
-                // Mirror the dashboard's valid-install guard: the pending downloads
-                // are from a stale UpdateInfo, so DON'T claim "update available"
-                // (which contradicts the dashboard's Play and points the user at an
-                // action that isn't offered).
-                SetCheckResult(Strings.Get("StatusInstalledVersionUnknown"), "TextSecondary");
-            }
-            else if (result.PendingDownloads.Count > 0)
-            {
-                SetCheckResult(Strings.Get("ModPropUpdateAvailable"), "AccentBrush");
-            }
-            else
-            {
-                SetCheckResult(Strings.Get("ModPropUpToDate"), "SuccessBrush");
-            }
+            // The shared judge, the same one the dashboard and the Workshop row use.
+            // This branch used to read result.PendingDownloads.Count, which UpdateService
+            // returns EMPTY by construction for GitHubReleases / Manual / DelegatedExternal
+            // - so for those mods the "update available" case was unreachable and the panel
+            // could only ever say "up to date".
+            ApplyUpdateState(result);
         }
         catch (Exception ex)
         {
             DiagnosticLog.Write($"ModPropertiesDialog.CheckUpdates failed: {ex.Message}");
-            SetCheckResult(Strings.Get("ModPropCheckFailed"), "ErrorBrush");
+            SetUpdateState(Services.UpdateVerdict.UpdateOffer.Failed, null);
         }
         finally
         {
@@ -1574,17 +1590,129 @@ public partial class ModPropertiesDialog : Window
     }
 
     /// <summary>
-    /// Paints the inline check-for-updates result line with one of the
-    /// theme brushes (resolved by key, with a graceful fallback so a
-    /// missing brush can't crash the handler).
+    /// Paints the whole update-state panel - chip colour, glyph, title AND body - from one
+    /// verdict.
+    ///
+    /// <para>All four used to be independent: the icon and the glyph had no code-behind
+    /// reference at all (permanently green, permanently a checkmark), the title was assigned
+    /// once in <c>ApplyStrings</c>, and only the body ever changed. Since the body's
+    /// up-to-date sentence used the same key as the frozen title, the ordinary state printed
+    /// the same sentence twice.</para>
     /// </summary>
-    private void SetCheckResult(string text, string brushKey)
+    /// <param name="offer">The verdict.</param>
+    /// <param name="result">The check it came from, for the version numbers in the body.
+    /// Null is allowed and simply leaves them out.</param>
+    private void SetUpdateState(
+        Services.UpdateVerdict.UpdateOffer offer, UpdateService.CheckResult? result)
     {
-        CheckUpdatesResult.Text = text;
-        CheckUpdatesResult.Foreground =
-            TryFindResource(brushKey) as System.Windows.Media.Brush
-            ?? System.Windows.Media.Brushes.White;
+        var current = result?.CurrentVersion?.Ver ?? _service.CurrentVersion?.Ver ?? "";
+        var latest = result?.LatestVersion?.Ver ?? "";
+
+        string title;
+        string body;
+        string chipKey;
+        string glyphKey;
+        string glyph;
+
+        switch (offer)
+        {
+            case Services.UpdateVerdict.UpdateOffer.UpdateAvailable:
+                title = Strings.Get("ModPropUpdateAvailableTitle");
+                body = Strings.Format("ModPropUpdateAvailableBody", latest, current);
+                chipKey = "MpChipCautionBg";
+                glyphKey = "MpCautionText";
+                glyph = "\uE896";   // download
+                break;
+
+            case Services.UpdateVerdict.UpdateOffer.VersionUnknown:
+                title = Strings.Get("ModPropUpdateUnknownTitle");
+                body = Strings.Format("ModPropUpdateUnknownBody", latest);
+                chipKey = "MpChipCautionBg";
+                glyphKey = "MpCautionText";
+                glyph = "\uE9CE";   // unknown
+                break;
+
+            case Services.UpdateVerdict.UpdateOffer.PausedByPin:
+                title = Strings.Get("ModPropUpdatePausedTitle");
+                body = Strings.Format("ModPropUpdatePausedBody", latest, current);
+                chipKey = "MpChipCautionBg";
+                glyphKey = "MpCautionText";
+                glyph = "\uE769";   // pause
+                break;
+
+            case Services.UpdateVerdict.UpdateOffer.NotInstalled:
+                title = Strings.Get("ModPropNotInstalledTitle");
+                body = Strings.Get("ModPropCheckNotInstalled");
+                chipKey = "MpChipCautionBg";
+                glyphKey = "MpCautionText";
+                glyph = "\uE7BA";   // warning
+                break;
+
+            case Services.UpdateVerdict.UpdateOffer.Failed:
+                title = Strings.Get("ModPropCheckFailedTitle");
+                body = Strings.Get("ModPropCheckFailed");
+                chipKey = "MpChipDangerBg";
+                glyphKey = "MpDestructiveText";
+                glyph = "\uEA39";   // error
+                break;
+
+            default:
+                title = Strings.Get("ModPropUpToDate");
+                // The version is NAMED, not just asserted: "you are up to date" over a
+                // number the user cannot see is exactly the claim that turned out false.
+                body = string.IsNullOrEmpty(current)
+                    ? ""
+                    : Strings.Format("ModPropUpToDateBody", current);
+                chipKey = "MpChipOkBg";
+                glyphKey = "MpOkText";
+                glyph = "\uE73E";   // checkmark
+                break;
+        }
+
+        // Belt and braces for the defect this panel started with: the two halves are never
+        // allowed to be the same sentence.
+        if (string.Equals(title, body, StringComparison.Ordinal)) body = "";
+
+        UpdateStateTitle.Text = title;
+        UpdateStateGlyph.Text = glyph;
+        ApplyBrush(UpdateStateIcon, Border.BackgroundProperty, chipKey);
+        ApplyBrush(UpdateStateGlyph, TextBlock.ForegroundProperty, glyphKey);
+
+        CheckUpdatesResult.Text = body;
+        CheckUpdatesResult.Visibility =
+            string.IsNullOrEmpty(body) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>The in-flight state. Not a verdict, so it keeps whatever chip the panel was
+    /// already showing and changes only the words.</summary>
+    private void SetCheckingState()
+    {
+        UpdateStateTitle.Text = Strings.Get("ModPropCheckingTitle");
+        CheckUpdatesResult.Text = Strings.Get("ModPropChecking");
         CheckUpdatesResult.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Evaluate a check result and paint it.</summary>
+    private void ApplyUpdateState(UpdateService.CheckResult? result) =>
+        SetUpdateState(
+            Services.UpdateVerdict.Evaluate(result, _profile, _config.GetState(_profile.Id)),
+            result);
+
+    /// <summary>
+    /// Paint the panel from what the main window already knows, with no network call. Called
+    /// on open, so the dialog never starts by claiming a state it has not checked.
+    /// </summary>
+    private void RefreshUpdateState() => ApplyUpdateState(_lastCheckResult?.Invoke());
+
+    /// <summary>Resolve a brush by resource key, leaving the property alone when the key is
+    /// missing rather than assigning a null brush.</summary>
+    private void ApplyBrush(
+        System.Windows.DependencyObject target,
+        System.Windows.DependencyProperty property,
+        string brushKey)
+    {
+        if (TryFindResource(brushKey) is System.Windows.Media.Brush brush)
+            target.SetValue(property, brush);
     }
 
     // ------------------------------------------------------------------------

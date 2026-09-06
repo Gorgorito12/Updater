@@ -1166,7 +1166,11 @@ public partial class MainWindow : Window
             current = cached.CurrentVersion?.Ver ?? "";
             available = cached.LatestVersion?.Ver ?? "";
             installed = cached.IsValidInstall;
-            hasUpdate = cached.PendingDownloads.Count > 0;
+            // One judge for every mechanism. PendingDownloads is a WolPatcher concept and is
+            // empty by construction for GitHubReleases / Manual / DelegatedExternal, so
+            // reading it here left the badge and the "Updates" filter blind to those mods.
+            hasUpdate = Services.UpdateVerdict.HasUpdate(
+                cached, profile, _config.GetState(profile.Id));
         }
         else
         {
@@ -5125,6 +5129,10 @@ public partial class MainWindow : Window
             },
             // Fase 1 — version picker (GitHubReleases only): list the repo's
             // releases, and install a chosen one through the shared update path.
+            // What we already know, WITHOUT forcing a check - so the dialog can paint its
+            // update-state panel the moment it opens instead of guessing.
+            lastCheckResult: () =>
+                _checkResultCache.TryGetValue(profile.Id, out var cached) ? cached : null,
             listVersions: () => ListGitHubVersionsAsync(),
             installVersion: tag => InstallGitHubVersionAsync(tag),
             // Multi-install management (the "Manage installs" section).
@@ -8579,10 +8587,13 @@ public partial class MainWindow : Window
                 var ghLatest = result.LatestVersion?.Ver;
                 bool isGh =
                     _updateService.Profile.UpdateMechanism == ModUpdateMechanism.GitHubReleases;
+                // Delegated to the shared judge so the dashboard, the Properties dialog and
+                // the Workshop row cannot answer this question three different ways again.
+                var ghOfferKind = Services.UpdateVerdict.Evaluate(
+                    result, _updateService.Profile, _config.GetState(_updateService.Profile.Id));
                 bool ghHasNewer =
-                    isGh
-                    && !string.IsNullOrEmpty(ghCur) && !string.IsNullOrEmpty(ghLatest)
-                    && !string.Equals(ghCur, ghLatest, StringComparison.OrdinalIgnoreCase);
+                    isGh && ghOfferKind is Services.UpdateVerdict.UpdateOffer.UpdateAvailable
+                                        or Services.UpdateVerdict.UpdateOffer.PausedByPin;
 
                 // Installed version UNKNOWN on a valid install. This is the normal
                 // state of a DETECTED GitHubReleases mod: the version is only ever
@@ -8595,12 +8606,12 @@ public partial class MainWindow : Window
                 // destructive from-scratch reinstall we never push, and its tail
                 // stamps LastKnownVersion — so one click also self-heals the state.
                 bool ghUnknownInstalled =
-                    isGh && string.IsNullOrEmpty(ghCur) && !string.IsNullOrEmpty(ghLatest);
+                    isGh && ghOfferKind == Services.UpdateVerdict.UpdateOffer.VersionUnknown;
                 bool ghOffer = ghHasNewer || ghUnknownInstalled;
                 // The user can pause the prompt by pinning their version (Fase 0).
-                // (Never fires for ghUnknownInstalled: IsUpdatePausedByPin needs a
-                // known CurrentVersion, so the ghCur! below stays safe.)
-                bool ghPaused = ghOffer && IsUpdatePausedByPin(result);
+                // (Never fires for ghUnknownInstalled: the pin needs a known CurrentVersion,
+                // so the ghCur! below stays safe.)
+                bool ghPaused = isGh && ghOfferKind == Services.UpdateVerdict.UpdateOffer.PausedByPin;
                 bool ghUpdate = ghOffer && !ghPaused;
 
                 // The primary CTA BECOMES "Update" — same rule WolPatcher already

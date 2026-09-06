@@ -1991,6 +1991,60 @@ public static class Strings
             [LangEn] = "Couldn't check for updates. See the logs for details.",
             [LangEs] = "No se pudo buscar actualizaciones. Revisa los registros para más detalles.",
         },
+        // --- Update-state panel (GENERAL). TITLE and BODY are two different sentences.
+        // They used to be the same one: the title was assigned once, unconditionally, to
+        // ModPropUpToDate, so the panel read "You're up to date." twice and stayed green
+        // over a mod with newer releases published. Every state below owns both halves.
+        ["ModPropUpToDateBody"] = new()
+        {
+            [LangEn] = "You have {0}, the latest published version.",
+            [LangEs] = "Tienes la {0}, la última versión publicada.",
+        },
+        ["ModPropUpdateAvailableTitle"] = new()
+        {
+            [LangEn] = "Update available",
+            [LangEs] = "Actualización disponible",
+        },
+        ["ModPropUpdateAvailableBody"] = new()
+        {
+            [LangEn] = "{0} has been published. You have {1}.",
+            [LangEs] = "Se ha publicado la {0}. Tú tienes la {1}.",
+        },
+        ["ModPropUpdateUnknownTitle"] = new()
+        {
+            [LangEn] = "Version not verified",
+            [LangEs] = "Versión sin verificar",
+        },
+        ["ModPropUpdateUnknownBody"] = new()
+        {
+            [LangEn] = "The mod is installed, but the launcher never recorded which version. Installing {0} will set it.",
+            [LangEs] = "El mod está instalado, pero el launcher nunca anotó qué versión es. Instalar la {0} lo dejará anotado.",
+        },
+        ["ModPropUpdatePausedTitle"] = new()
+        {
+            [LangEn] = "Updates paused",
+            [LangEs] = "Actualizaciones en pausa",
+        },
+        ["ModPropUpdatePausedBody"] = new()
+        {
+            [LangEn] = "{0} is published, but you chose to stay on {1}. Turn the switch below off to be offered it.",
+            [LangEs] = "Está publicada la {0}, pero elegiste quedarte en la {1}. Apaga el interruptor de abajo para que se te ofrezca.",
+        },
+        ["ModPropNotInstalledTitle"] = new()
+        {
+            [LangEn] = "Not installed",
+            [LangEs] = "Sin instalar",
+        },
+        ["ModPropCheckFailedTitle"] = new()
+        {
+            [LangEn] = "Couldn't check",
+            [LangEs] = "No se pudo comprobar",
+        },
+        ["ModPropCheckingTitle"] = new()
+        {
+            [LangEn] = "Checking…",
+            [LangEs] = "Comprobando…",
+        },
         ["ModPropOpenAoE3Folder"] = new()
         {
             [LangEn] = "Open AoE3 folder",
