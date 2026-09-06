@@ -353,6 +353,58 @@ public sealed class NotificationCenter
         return true;
     }
 
+    /// <summary>
+    /// "A mod you do not have published a patch." Deduped on (mod, version) via
+    /// <see cref="LauncherConfig.NotifiedCatalogVersions"/>. Returns true if an item was added.
+    /// </summary>
+    /// <param name="record">
+    /// When false the version is recorded WITHOUT belling. That is how installed mods keep
+    /// their entry current: they bell through <see cref="RaiseUpdateAvailable"/> instead, and
+    /// leaving their entry stale would fire a patch notice the moment they were uninstalled.
+    /// </param>
+    public bool RaiseModPatch(
+        string modId, string version, string title, string body, bool record = true)
+    {
+        if (string.IsNullOrWhiteSpace(modId) || string.IsNullOrWhiteSpace(version)) return false;
+
+        _config.NotifiedCatalogVersions.TryGetValue(modId, out var seen);
+        if (string.Equals(seen, version, StringComparison.OrdinalIgnoreCase)) return false;
+
+        _config.NotifiedCatalogVersions[modId] = version;
+        if (!record)
+        {
+            Persist();
+            return false;
+        }
+
+        return Add(new NotificationItem
+        {
+            Kind = NotificationKind.ModPatchPublished,
+            ModId = modId,
+            Title = title,
+            Body = body,
+        });
+    }
+
+    /// <summary>
+    /// Silently record every catalog mod's current version, once.
+    ///
+    /// <para>Same non-negotiable rule as <see cref="SeedAnnouncementBaseline"/> and
+    /// <see cref="SeedCatalogBaseline"/>: without it, the first launcher to read the feed
+    /// bells a patch notice for the whole catalog at once.</para>
+    /// </summary>
+    /// <returns>True when it did the seeding, so the caller skips its diff on that pass.</returns>
+    public bool SeedCatalogVersionBaseline(IEnumerable<KeyValuePair<string, string>> versions)
+    {
+        if (_config.CatalogVersionBaselineSeeded) return false;
+        foreach (var pair in versions)
+            if (!string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                _config.NotifiedCatalogVersions[pair.Key] = pair.Value;
+        _config.CatalogVersionBaselineSeeded = true;
+        Persist();
+        return true;
+    }
+
     public bool SeedCatalogBaseline(IEnumerable<string> modIds)
     {
         if (_config.CatalogBaselineSeeded) return false;

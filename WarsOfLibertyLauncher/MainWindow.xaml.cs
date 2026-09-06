@@ -735,6 +735,9 @@ public partial class MainWindow : Window
             }
 
             if (!App.StartMinimized) EnsureForegroundWorkStarted();
+            // Armed either way: a launcher started minimised at logon is precisely the one
+            // that needs to keep telling the user about patches.
+            else EnsureBackgroundPollStarted();
 
             // One-time-per-launch migration sweep for the "disk cache only for
             // installed + active" policy: older builds cached images for every
@@ -2560,10 +2563,29 @@ public partial class MainWindow : Window
         _foregroundWorkStarted = true;
 
         _ = RefreshNewsAsync();
+        EnsureBackgroundPollStarted();
+    }
 
-        // Periodic: 5 min aligns with raw.githubusercontent's CDN cache, so polling faster
-        // wouldn't see changes any sooner. Each tick revalidates only the ACTIVE mod's
-        // images (cheap); every 3rd tick (~15 min) also forces a catalog manifest re-fetch.
+    /// <summary>
+    /// The periodic poll: catalog refresh, image revalidation, and the notification sweep.
+    ///
+    /// <para><b>Separate from <see cref="EnsureForegroundWorkStarted"/> on purpose.</b> That
+    /// method is gated on <c>!App.StartMinimized</c> because news and image revalidation are
+    /// work for a window somebody is looking at. The notification sweep is the opposite: a
+    /// launcher sitting in the tray is exactly where a notification has to arrive, and while
+    /// this timer lived inside the foreground gate, a launcher started minimised at logon
+    /// never armed it at all — it told the user nothing until they opened the window, which
+    /// is the moment they no longer needed to be told.</para>
+    ///
+    /// <para>The one piece that IS visible-only stays visible-only: the asset revalidation
+    /// below still waits for the window to have been shown.</para>
+    ///
+    /// <para>Periodic: 5 min aligns with raw.githubusercontent's CDN cache, so polling faster
+    /// would not see changes any sooner.</para>
+    /// </summary>
+    private void EnsureBackgroundPollStarted()
+    {
+        if (_catalogPollTimer != null) return;
         if (!_config.CheckUpdatesOnStartup) return;
 
         _catalogPollTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
@@ -2572,10 +2594,12 @@ public partial class MainWindow : Window
             _pollTickCount++;
             if (_pollTickCount % 3 == 0)
                 await MaybeForceCatalogRefreshAsync();
-            await RevalidateVisibleAssetsAsync(activeOnly: true);
-            // Every 6th tick (~30 min): sweep the OTHER installed mods for
-            // update / new-translation notifications. Throttled well below
-            // the image revalidation so it stays within the GitHub API budget.
+            // Images are for eyes. Nobody is looking at a tray icon.
+            if (_foregroundWorkStarted)
+                await RevalidateVisibleAssetsAsync(activeOnly: true);
+            // Every 6th tick (~30 min): sweep the catalog for update / patch /
+            // new-translation notifications. Throttled well below the image revalidation
+            // so it stays within the GitHub API budget.
             if (_pollTickCount % 6 == 0)
                 await SweepInstalledModsForNotificationsAsync();
         };
@@ -2668,6 +2692,7 @@ public partial class MainWindow : Window
         NotificationKind.NewTranslation => _bellGold,
         NotificationKind.RoomCreated => _bellBlue,
         NotificationKind.MatchRated => _bellGold,
+        NotificationKind.ModPatchPublished => _bellBlue,
         _ => _bellSoftWhite,
     };
 
@@ -2871,8 +2896,11 @@ public partial class MainWindow : Window
         var profile = ModRegistry.Find(item.ModId);
         if (profile == null) return;
 
-        // New mod in the catalog: open the Workshop with its detail panel.
-        if (item.Kind == NotificationKind.NewMod)
+        // New mod in the catalog, or a patch for one that is not installed: both open the
+        // Workshop detail panel. Deliberately NOT the Library dashboard the update items go
+        // to - there is no install here to press Update on.
+        if (item.Kind == NotificationKind.NewMod
+            || item.Kind == NotificationKind.ModPatchPublished)
         {
             try
             {
@@ -13102,6 +13130,10 @@ public partial class MainWindow : Window
         // so this keeps working on the cheap path.
         if (feed != null) MaybeNotifyAnnouncements(feed);
 
+        // Likewise independent of the per-mod loop below, which only visits mods that are
+        // INSTALLED: a patch published for a mod you do not have is still news.
+        if (feed != null) MaybeNotifyCatalogPatches(feed);
+
         var activeId = _updateService.Profile.Id;
         foreach (var profile in ModRegistry.All)
         {
@@ -13320,6 +13352,70 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             DiagnosticLog.Write($"Announcement notification sweep failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Bell a patch published for a catalog mod this launcher does NOT have installed.
+    ///
+    /// <para>The installed ones are already covered: the active mod live through
+    /// <see cref="ApplyCheckResult"/>, the rest through <see cref="ApplyFeedToMod"/> in the
+    /// sweep's own loop. That loop skips anything with no install path, which is correct for
+    /// an "update available" — there is nothing to update — but it also meant a mod shipping
+    /// a patch was silent for everyone who had not installed it yet.</para>
+    ///
+    /// <para><b>The baseline seed is not optional.</b> The first read records every mod's
+    /// current version WITHOUT belling; otherwise the day somebody installs the launcher they
+    /// are handed the whole catalog at once. Same rule the announcements and the catalog
+    /// listing each had to learn.</para>
+    ///
+    /// <para>Rides the central feed only. The per-mod GitHub fallback exists for installed
+    /// mods and costs one API call each; spending that budget on mods the player does not
+    /// have would be the wrong trade, so when the feed is down this simply says nothing.</para>
+    /// </summary>
+    private void MaybeNotifyCatalogPatches(NotificationFeed feed)
+    {
+        try
+        {
+            if (feed.Mods == null || feed.Mods.Count == 0) return;
+
+            // What the feed actually knows a version for. An entry the server could not
+            // resolve arrives as an empty string, and that is "no answer", not "no version" —
+            // belling it would announce a release nobody published.
+            var known = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var profile in ModRegistry.All)
+            {
+                if (profile.IsStockGame) continue;
+                if (!feed.Mods.TryGetValue(profile.Id, out var entry) || entry == null) continue;
+                if (string.IsNullOrWhiteSpace(entry.LatestVersion)) continue;
+                known[profile.Id] = entry.LatestVersion;
+            }
+            if (known.Count == 0) return;
+
+            // First ever read: record everything, bell nothing.
+            if (_notifications.SeedCatalogVersionBaseline(known)) return;
+
+            foreach (var pair in known)
+            {
+                var profile = ModRegistry.Find(pair.Key);
+                if (profile == null) continue;
+
+                // Installed mods keep their entry current but never bell here — they have
+                // their own update path. Letting the entry go stale would fire a patch
+                // notice the moment the player uninstalled them.
+                bool installed = !string.IsNullOrEmpty(_config.GetState(profile.Id).InstallPath);
+
+                _notifications.RaiseModPatch(
+                    profile.Id,
+                    pair.Value,
+                    Strings.Get("NotifModPatchTitle"),
+                    Strings.Format("NotifModPatchBody", profile.DisplayName, pair.Value),
+                    record: !installed);
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Write($"Catalog patch notification sweep failed: {ex.Message}");
         }
     }
 

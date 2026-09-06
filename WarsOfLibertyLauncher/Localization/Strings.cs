@@ -7832,6 +7832,18 @@ public static class Strings
             [LangEs] = "Las funciones en línea vuelven a estar disponibles.",
         },
         // ---- Bell: new mod in the catalog ----
+        // A patch for a mod the player does NOT have installed. Worded so it cannot be
+        // mistaken for the update item: nothing here is waiting to be applied.
+        ["NotifModPatchTitle"] = new()
+        {
+            [LangEn] = "New patch published",
+            [LangEs] = "Nuevo parche publicado",
+        },
+        ["NotifModPatchBody"] = new()
+        {
+            [LangEn] = "{0} released {1}. You don't have this mod installed.",
+            [LangEs] = "{0} ha publicado la {1}. No tienes este mod instalado.",
+        },
         ["NotifNewModTitle"] = new()
         {
             [LangEn] = "New mod available",
