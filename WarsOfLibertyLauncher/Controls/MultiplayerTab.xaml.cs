@@ -6166,7 +6166,28 @@ public partial class MultiplayerTab : UserControl
         return stack;
     }
 
-    private static StackPanel BuildTableCard() => new();
+    /// <summary>
+    /// The shared-size group that pins the actions column to one width across a card's rows
+    /// and its header. Precedent in this file: the profile's history table does the same, and
+    /// its comment records the constraint that applies here too - a SharedSizeGroup only works
+    /// on an Auto or absolute width, never on a star.
+    /// </summary>
+    private const string EntrantActionsSizeGroup = "TournamentEntrantActions";
+
+    /// <summary>
+    /// One card, and one shared-size scope.
+    ///
+    /// <para>PER CARD, not one for the whole list. The applications card carries an
+    /// "Accept"/"Reject" pair that is far wider than a lone "Withdraw"; a single scope would
+    /// hand that width to the IN table as well and squeeze the entrant names for a button
+    /// those rows do not have.</para>
+    /// </summary>
+    private static StackPanel BuildTableCard()
+    {
+        var card = new StackPanel();
+        Grid.SetIsSharedSizeScope(card, true);
+        return card;
+    }
 
     private static Border WrapTable(StackPanel rows)
     {
@@ -6256,7 +6277,20 @@ public partial class MultiplayerTab : UserControl
         // from the column's right edge, across the status and over the name. Auto gives the
         // strip what it asks for and takes it from the star column, which is the only one that
         // can give: the name is the one thing in this row with TextTrimming.
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        //
+        // SHARED, because Auto alone is measured per Grid and there is one Grid PER ROW. So
+        // the row with a "Withdraw" button surrendered star width that the row beside it kept,
+        // and the left edge of the status column - which is 46 + whatever the star came to -
+        // landed at a different x on every row. That is the asymmetry: "In" under a button and
+        // "No seed" without one were never going to line up, and the STATUS heading, whose row
+        // has no actions at all, sat furthest right of the lot. One shared group per card
+        // resolves every row and the header to the same actions width, so the three columns
+        // line up down the whole table.
+        grid.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+            SharedSizeGroup = EntrantActionsSizeGroup,
+        });
         return grid;
     }
 
@@ -6389,8 +6423,11 @@ public partial class MultiplayerTab : UserControl
                 : noSeed ? Strings.Get("MpTournamentNoSeed")
                 : EntrantStatusLabel(e.Status),
             VerticalAlignment = VerticalAlignment.Center,
-            FontWeight = noSeed ? FontWeights.SemiBold : FontWeights.Normal,
         };
+        // ONE WEIGHT for every state. "No seed" used to be SemiBold while "In" was Normal, so
+        // even once the columns line up the two read as different columns - the eye takes a
+        // change of weight down a column as a change of kind. The emphasis is already carried
+        // by the colour, which is where the rest of this page puts it.
         statusText.SetResourceReference(TextBlock.FontSizeProperty, "MpLabelSize");
         statusText.SetResourceReference(TextBlock.ForegroundProperty, inkBrush);
         statusCell.Children.Add(statusText);

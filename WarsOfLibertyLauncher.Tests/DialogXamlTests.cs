@@ -2080,6 +2080,126 @@ public class DialogXamlTests
     }
 
     /// <summary>
+    /// THE SYMMETRY ONE. The status column starts at the same x on every row of a card, and
+    /// on its header.
+    ///
+    /// <para>It did not. <c>BuildEntrantGrid</c> hands out a NEW Grid per row, so the Auto
+    /// actions column was measured per row and took its width out of the star column beside
+    /// it. A row with "Withdraw" therefore gave up star width that the row under it kept, and
+    /// the status column - whose left edge is 46 plus whatever the star came to - landed
+    /// somewhere different on each. "In" beside a button and "No seed" without one could never
+    /// line up, and the STATUS heading, on a row with no actions at all, sat furthest right of
+    /// the lot.</para>
+    ///
+    /// <para>Measured against the HEADING, deliberately: the heading is the column's promise,
+    /// and a table whose rows agree with each other but not with their own header is still
+    /// wrong.</para>
+    /// </summary>
+    [Fact]
+    public void THE_SYMMETRY_ONE_EveryStatusStartsUnderTheStatusHeading()
+    {
+        var error = RunOnStaThread(() =>
+        {
+            EnsureResources();
+            var previous = Strings.Language;
+            try
+            {
+                // Spanish: the longest captions, which is what made the columns diverge.
+                Strings.SetLanguage("es");
+                var tab = new WarsOfLibertyLauncher.Controls.MultiplayerTab();
+
+                // The three shapes that used to disagree: a confirmed entrant with a Withdraw
+                // button (it is me), one with only the overflow, and one with no seed at all.
+                var t = new TournamentDetail
+                {
+                    Id = "c1",
+                    Name = "Copa",
+                    Status = "registration",
+                    OwnerUserId = "someone-else",
+                    Capacity = 8,
+                    Entrants = new List<TournamentEntrant>
+                    {
+                        new()
+                        {
+                            Id = "e1", Kind = "solo", DisplayName = "Gorgo", Status = "confirmed",
+                            Seed = 1, CaptainUserId = "me", MemberIds = new List<string> { "me" },
+                        },
+                        new()
+                        {
+                            Id = "e2", Kind = "solo", DisplayName = "Aluclown", Status = "confirmed",
+                            Seed = 2, CaptainUserId = "u2", MemberIds = new List<string> { "u2" },
+                        },
+                        new()
+                        {
+                            Id = "e3", Kind = "solo", DisplayName = "Vandalia", Status = "confirmed",
+                            Seed = null, CaptainUserId = "u3", MemberIds = new List<string> { "u3" },
+                        },
+                    },
+                };
+
+                var list = (FrameworkElement)tab.BuildEntrantsList(t, "me");
+
+                const double narrowest = 900 - 64 - 300 - 21;
+                list.Measure(new Size(narrowest, double.PositiveInfinity));
+                list.Arrange(new Rect(0, 0, narrowest, list.DesiredSize.Height));
+                list.UpdateLayout();
+
+                // Every status label, plus the heading, by their own text rather than by
+                // arithmetic over the column widths - so this keeps meaning what it says if
+                // those widths are ever retuned.
+                var wanted = new[]
+                {
+                    Strings.Get("MpTournamentColStatus"),
+                    Strings.Get("MpTournamentNoSeed"),
+                    EntrantStatusText("confirmed"),
+                };
+
+                var lefts = VisualsUnder(list).OfType<TextBlock>()
+                    .Where(x => wanted.Contains(x.Text))
+                    .Select(x => (x.Text, X: x.TranslatePoint(new Point(0, 0), list).X))
+                    .ToList();
+
+                // The three shapes really are all on screen, or this would pass over an empty
+                // table.
+                Assert.Contains(lefts, l => l.Text == Strings.Get("MpTournamentColStatus"));
+                Assert.Contains(lefts, l => l.Text == Strings.Get("MpTournamentNoSeed"));
+                Assert.True(lefts.Count >= 4, $"only {lefts.Count} status cells were drawn.");
+
+                var heading = lefts.First(l => l.Text == Strings.Get("MpTournamentColStatus")).X;
+                foreach (var (text, x) in lefts)
+                {
+                    // The status dot sits before the label in a row and not in the header, so
+                    // the label itself is offset by the dot's width there. What must hold is
+                    // that every ROW agrees, and that none of them wanders off the heading.
+                    Assert.True(System.Math.Abs(x - heading) < 20,
+                        $"\"{text}\" starts at {x:0} but the STATUS heading is at {heading:0}. "
+                        + "The actions column is being measured per row again, so the star "
+                        + "column - and with it the status column's left edge - is a different "
+                        + "width on every row.");
+                }
+
+                // And the rows agree with each OTHER exactly, dot and all.
+                var rowLefts = lefts
+                    .Where(l => l.Text != Strings.Get("MpTournamentColStatus"))
+                    .Select(l => l.X)
+                    .ToList();
+                Assert.True(rowLefts.Max() - rowLefts.Min() < 0.5,
+                    $"the status labels start between {rowLefts.Min():0} and {rowLefts.Max():0}; "
+                    + "they are meant to be one column.");
+            }
+            finally
+            {
+                Strings.SetLanguage(previous);
+            }
+        });
+        Assert.Null(error);
+    }
+
+    /// <summary>The label a confirmed entrant's status cell carries.</summary>
+    private static string EntrantStatusText(string status) =>
+        Strings.Get("MpTournamentEntrantConfirmed");
+
+    /// <summary>
     /// The DIAGNOSTICS row of the mod properties window has to fit its three actions at the
     /// window's narrowest, in the widest language.
     ///
