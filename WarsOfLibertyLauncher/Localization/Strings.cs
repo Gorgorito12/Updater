@@ -4495,17 +4495,20 @@ public static class Strings
         },
         ["MpStatsDecksEmptyBody"] = new()
         {
-            [LangEn] = "This table is built from the decks players choose to share, and it is "
-                       + "off unless you turn it on. It says which cards people BRING - no "
+            [LangEn] = "This table is built from the decks players share, and nobody has "
+                       + "shared one for this mod yet. It says which cards people BRING - no "
                        + "recording carries the card that was actually played.",
-            [LangEs] = "Esta tabla se construye con los mazos que los jugadores deciden "
-                       + "compartir, y viene apagada. Dice qué cartas TRAE la gente: ninguna "
-                       + "grabación lleva la carta que se jugó.",
+            [LangEs] = "Esta tabla se construye con los mazos que comparten los jugadores, y "
+                       + "todavía nadie ha compartido uno de este mod. Dice qué cartas TRAE "
+                       + "la gente: ninguna grabación lleva la carta que se jugó.",
         },
         ["MpStatsDecksEmptyAction"] = new()
         {
-            [LangEn] = "It is in Settings, under Multiplayer.",
-            [LangEs] = "Está en Ajustes, en Multijugador.",
+            // PRIVACY, not Multiplayer. The switch hangs off PrivacyHeader in
+            // LauncherSettingsDialog.xaml; this line had been sending people to the wrong
+            // section since it was written.
+            [LangEn] = "You share yours by default; it is in Settings, under Privacy.",
+            [LangEs] = "Tú compartes los tuyos por defecto; está en Ajustes, en Privacidad.",
         },
         ["MpStatsWindowDays"] = new()
         {
@@ -4774,11 +4777,11 @@ public static class Strings
         },
         ["DlgSettingsShareDecksHint"] = new()
         {
-            [LangEn] = "Off by default. Sends the card names in your decks, per civilization, "
+            [LangEn] = "On by default. Sends the card names in your decks, per civilization, "
                      + "so Multiplayer → Statistics can show which cards people bring. No deck "
                      + "names, no matches, no dates. Turning it off stops it; what you already "
                      + "sent is replaced the next time you share and stays otherwise.",
-            [LangEs] = "Apagado por defecto. Envía los nombres de las cartas de tus mazos, por "
+            [LangEs] = "Encendido por defecto. Envía los nombres de las cartas de tus mazos, por "
                      + "civilización, para que Multijugador → Estadísticas muestre qué cartas "
                      + "lleva la gente. Ni nombres de mazos, ni partidas, ni fechas. Apagarlo "
                      + "lo detiene; lo que ya enviaste se reemplaza la próxima vez que "

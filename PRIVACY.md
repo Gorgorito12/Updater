@@ -19,8 +19,9 @@ launcher does, please [open an issue](https://github.com/Gorgorito12/AoE3-Mod-La
   until you choose to sign in with Discord.
 - **The local telemetry log is OFF by default** and never leaves your computer
   even when enabled.
-- **Sharing your decks is OFF by default** — nothing about your decks leaves
-  your computer unless you turn it on in Settings.
+- **Sharing your decks is ON by default** — the card names in your home city
+  decks (and nothing else about them) go to the lobby server, so the community
+  card table has something in it. One switch in Settings stops it, for good.
 - **Starting with Windows is asked for, not assumed.** The launcher adds nothing
   to your startup until you say yes on the first launch, and never asks twice.
 
@@ -142,12 +143,18 @@ To stop sharing this, leave the teams you are in and do not enter tournaments.
 Disbanding a team keeps the record of tournaments it already played, because those
 brackets have to keep showing who took part.
 
-### 4. Home city decks (opt-in, OFF by default)
+### 4. Home city decks (ON by default)
 
-If — and only if — you turn on **Launcher Settings → Privacy → "Share my decks
-with the community table"**, the launcher sends the **card names in your home
-city decks**, grouped by civilization, to the same lobby server. This is what
-fills the "Cards the community brings" table in **Multiplayer → Statistics**.
+Unless you turn off **Launcher Settings → Privacy → "Share my decks with the
+community table"**, the launcher sends the **card names in your home city
+decks**, grouped by civilization, to the same lobby server. This is what fills
+the "Cards the community brings" table in **Multiplayer → Statistics**.
+
+**This changed in 1.0.14b.** It used to be off until you turned it on, and it is
+now on until you turn it off — including on launchers that were already
+installed, which are switched on once when they start. If that is not what you
+want, the switch is in the same place it always was and **turning it off is
+final**: it is never switched back on for you.
 
 **What is sent:** the internal card names, the civilization each deck belongs to,
 the mod, and the Discord account you are signed in with.
@@ -161,9 +168,10 @@ never records which one it was, so no such data exists to send.
 **replaces** what your account sent before, so it is a statement of what you
 currently carry rather than a history.
 
-**Turning it off** stops any further upload immediately. What you already sent
-stays on the server until you share again (which replaces it); ask on Discord if
-you want it removed outright.
+**Turning it off** stops any further upload immediately, and stays off through
+every later launch — the one-time switch-on above happens once per computer and
+never again. What you already sent stays on the server until you share again
+(which replaces it); ask on Discord if you want it removed outright.
 
 Because this is self-reported, it is used **only** for that popularity table and
 never for ratings or matchmaking.

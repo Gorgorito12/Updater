@@ -15,6 +15,10 @@ namespace WarsOfLibertyLauncher.Tests;
 /// <para><see cref="LauncherConfig.ApplyDeveloperModeResetMigration"/>: the one-time
 /// switch-off of developer mode for the people who had turned it on while its switch was
 /// still in plain sight in GENERAL.</para>
+///
+/// <para><see cref="LauncherConfig.ApplyShareDecksDefaultMigration"/>: the one-time switch-ON
+/// of deck sharing. That one goes the other way and is the more delicate of the two - it
+/// starts sending something, so the marker is what has to make "off" mean off.</para>
 /// </summary>
 public class LauncherConfigMigrationTests
 {
@@ -83,6 +87,68 @@ public class LauncherConfigMigrationTests
     }
 
     // ------------------------------------------------ retiring an already-on developer mode
+
+    /// <summary>
+    /// THE ONE THAT MATTERS. Somebody who already has the launcher starts sharing.
+    ///
+    /// <para>Changing the property's default alone would have done NOTHING for them: the whole
+    /// config is serialised on every save, so <c>shareDeckStats: false</c> is already written
+    /// in every file that exists and deserialisation puts it straight back over the new
+    /// default. Only a migration reaches them, which is the whole reason this one exists.</para>
+    /// </summary>
+    [Fact]
+    public void THE_ONE_THAT_MATTERS_AConfigThatNeverChoseStartsSharing()
+    {
+        // What an existing install looks like: the flag written false, no marker.
+        var cfg = new LauncherConfig { ShareDeckStats = false };
+
+        Assert.True(cfg.ApplyShareDecksDefaultMigration());
+        Assert.True(cfg.ShareDeckStats);
+        Assert.True(cfg.ShareDecksDefaultSeeded);
+    }
+
+    /// <summary>
+    /// And having turned it off, it STAYS off - through this launch and every one after.
+    ///
+    /// <para>This is the half that makes the switch mean anything. Key the migration off "the
+    /// flag is false" instead of off the marker and turning it off would be undone at the next
+    /// start, which is not a setting, it is a countdown. It is also the "disableable" half of
+    /// the code-signing terms this data collection is disclosed under.</para>
+    /// </summary>
+    [Fact]
+    public void TurningItOffSurvivesEveryLaunch()
+    {
+        var cfg = new LauncherConfig { ShareDeckStats = false, ShareDecksDefaultSeeded = true };
+
+        for (var launch = 0; launch < 3; launch++)
+        {
+            Assert.False(cfg.ApplyShareDecksDefaultMigration());
+            Assert.False(cfg.ShareDeckStats);
+        }
+    }
+
+    /// <summary>A fresh install shares from the start, with no migration involved.</summary>
+    [Fact]
+    public void AFreshConfigSharesFromTheStart()
+    {
+        Assert.True(new LauncherConfig().ShareDeckStats);
+    }
+
+    /// <summary>
+    /// The marker is set even when nothing else changed, so the migration never looks twice.
+    ///
+    /// <para>Same shape as the developer-mode one: one config save on one launch buys never
+    /// having to ask again.</para>
+    /// </summary>
+    [Fact]
+    public void SomebodyAlreadySharingIsMarkedAndLeftAlone()
+    {
+        var cfg = new LauncherConfig { ShareDeckStats = true };
+
+        Assert.True(cfg.ApplyShareDecksDefaultMigration());
+        Assert.True(cfg.ShareDeckStats);
+        Assert.True(cfg.ShareDecksDefaultSeeded);
+    }
 
     /// <summary>
     /// Somebody who had switched developer mode on back when its switch was a visible row at

@@ -1400,13 +1400,16 @@ public class LauncherConfig
     public bool MultiplayerTelemetryEnabled { get; set; } = false;
 
     /// <summary>
-    /// Opt-in switch for contributing your home-city decks to the community card table
-    /// (Multiplayer → STATISTICS). Off by default.
+    /// Contributes your home-city decks to the community card table (Multiplayer →
+    /// STATISTICS). <b>On by default</b>, and switched on once for configs that predate that
+    /// — see <see cref="ApplyShareDecksDefaultMigration"/>.
     ///
     /// <para><b>This is the ONE thing in the launcher that sends data off the player's own
-    /// disk that is not about a match they played</b>, which is why it is opt-in and why it
-    /// is disclosed in PRIVACY.md — the SignPath Foundation OSS terms require collection to
-    /// be both disclosed and disableable, and this is collection.</para>
+    /// disk that is not about a match they played</b>, so it stays disclosed in PRIVACY.md and
+    /// it stays switchable: the SignPath Foundation OSS terms require collection to be both
+    /// disclosed and disableable, and this is collection. Defaulting it on changes the first
+    /// of those and not the second — which is why the migration is keyed off a MARKER and not
+    /// off the flag, so that turning it off is final.</para>
     ///
     /// <para>What goes up is the CARD NAMES a deck holds, per civilization, keyed to the
     /// Discord account the player is already signed in with. No deck name (that is whatever
@@ -1422,7 +1425,28 @@ public class LauncherConfig
     /// machine — so nothing derived from it may ever reach the rating path.</para>
     /// </summary>
     [JsonPropertyName("shareDeckStats")]
-    public bool ShareDeckStats { get; set; } = false;
+    public bool ShareDeckStats { get; set; } = true;
+
+    /// <summary>
+    /// Whether <see cref="ShareDeckStats"/> has already been switched on once for a config
+    /// written before it defaulted on.
+    ///
+    /// <para><b>Changing the default alone reaches nobody who already has the launcher.</b>
+    /// The whole config is serialised on every save, so <c>shareDeckStats: false</c> is
+    /// already written in every file that exists, and deserialising it puts that straight back
+    /// over the new default. Only a migration reaches them.</para>
+    ///
+    /// <para><b>Keyed off THIS marker and never off "the flag is false".</b> Read from the
+    /// flag, the seed would run on every launch and turning the switch off would be undone at
+    /// the next start — which is not a setting, it is a countdown, and it would break the
+    /// "disableable" half of the terms this collection is disclosed under. Same invariant as
+    /// <see cref="BackgroundDefaultSeeded"/> and <see cref="DeveloperModeRetired"/>.</para>
+    ///
+    /// <para>Set even when the flag was ALREADY true, so the migration never looks again.
+    /// That costs one config save on one launch.</para>
+    /// </summary>
+    [JsonPropertyName("shareDecksDefaultSeeded")]
+    public bool ShareDecksDefaultSeeded { get; set; } = false;
 
     /// <summary>
     /// Public URL of the project's privacy policy (PRIVACY.md on GitHub).
@@ -1963,6 +1987,7 @@ public class LauncherConfig
         cfg.MigrateLobbyBaseUrl();
         cfg.MigrateTranslationsFolderRepo();
         cfg.MigrateDeveloperModeReset();
+        cfg.MigrateShareDecksDefault();
         cfg.NormalizeModInstalls();
         return cfg;
     }
@@ -2078,6 +2103,28 @@ public class LauncherConfig
     /// The <see cref="Save"/> and the log line live here; the decision is in
     /// <see cref="ApplyDeveloperModeResetMigration"/>.
     /// </summary>
+    /// <summary>
+    /// Turn deck sharing on, once, for a config that predates it being the default. The
+    /// decision is in <see cref="ApplyShareDecksDefaultMigration"/>.
+    /// </summary>
+    private void MigrateShareDecksDefault()
+    {
+        // Read BEFORE the migration mutates it: "sharing is on" says nothing in a diagnostic
+        // bundle without knowing whether this launch is what turned it on.
+        bool wasOn = ShareDeckStats;
+
+        if (!ApplyShareDecksDefaultMigration()) return;
+        try { Save(); }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Write($"Config shareDeckStats seed save failed: {ex.Message}");
+        }
+        DiagnosticLog.Write(wasOn
+            ? "Deck sharing was already on; the seed marker is set so it is never forced again."
+            : "Deck sharing seeded on for a config that predates the default; "
+              + "turning it off in Settings -> Privacy is final.");
+    }
+
     private void MigrateDeveloperModeReset()
     {
         // Read BEFORE the migration mutates it. The two cases are worth telling apart in a
@@ -2119,6 +2166,25 @@ public class LauncherConfig
 
         DeveloperModeRetired = true;
         DeveloperMode = false;
+        return true;
+    }
+
+    /// <summary>
+    /// Switch deck sharing on, once, for a config written before it defaulted on. The
+    /// <see cref="Save"/> and the log line live in <see cref="MigrateShareDecksDefault"/>;
+    /// the decision is here, pure and testable.
+    /// </summary>
+    ///
+    /// <para>Marker first, then the flip, for the reason on
+    /// <see cref="BackgroundDefaultSeeded"/>: a failed save must not leave this retrying on
+    /// every launch. And the guard is the marker, so somebody who turns it off stays off —
+    /// see <see cref="ShareDecksDefaultSeeded"/>.</para>
+    internal bool ApplyShareDecksDefaultMigration()
+    {
+        if (ShareDecksDefaultSeeded) return false;
+
+        ShareDecksDefaultSeeded = true;
+        ShareDeckStats = true;
         return true;
     }
 
