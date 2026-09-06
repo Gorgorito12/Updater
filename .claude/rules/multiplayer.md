@@ -4851,6 +4851,22 @@ parameter is absent, so an older launcher receives exactly what it always did.
   set. The default-open group is chosen ONCE (`_deckCivsSeeded`) - re-deciding it per repaint
   would slam shut a group that had just been opened.
 
+- **CAPPING THE STATISTICS PAGE'S WIDTH WAS TRIED AND REJECTED - do not re-propose it when
+  somebody says the figure is far from its name.** The diagnosis is right and worth keeping:
+  maximised on a 2560 panel a row stretches until a card's count sits two thousand pixels from
+  the card, and at that distance the figure stops reading as a property of the name. The
+  remedy is what failed. It shipped as `MaxWidth` 1086 with `HorizontalAlignment.Left`,
+  copying `EntrantTableWidth`, and the verdict on sight was that the emptiness to the right
+  costs more than the closeness buys - "todo deberia abarcar todo como antes".
+  **What is wrong is the remedy, not the diagnosis.** The tournament entrant table caps
+  because it owns its whole panel; this page already has a 310-wide side column holding the
+  right-hand side, so a cap on top of that only adds void. And the settings surface had
+  already rejected three cap shapes for the same reason (`Tokens.xaml`, above
+  `SetDescMaxWidth`).
+  The one place this repo does accept a limit is what WRAPS rather than the column - that is
+  what `SetDescMaxWidth` is - and here even that was declined deliberately: a footnote running
+  as one line across an ultrawide was accepted in exchange for no dead space anywhere.
+
 - **A CARD'S DESCRIPTION IS BUILT, NOT READ, AND MOST CARDS HAVE NO WRITTEN ONE.** Reading
   `CardDetail.Description` alone showed nothing at all for most of the table: every unit
   shipment and crate carries no `RolloverTextID`, so the sentence is null and the figures live

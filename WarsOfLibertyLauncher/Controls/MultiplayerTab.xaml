@@ -1412,13 +1412,7 @@
             <ScrollViewer x:Name="StatsScroll"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <!-- Capped and LEFT. A statistics row is a name on the left and a figure
-                     hard right; stretched across a maximised window the two stop belonging to
-                     each other. Same call, and the same 760, as the entrant table in this tab.
-                     The cap is under the default window, so nothing below 1100 moves. -->
-                <StackPanel Margin="14,16,14,18"
-                            HorizontalAlignment="Left"
-                            MaxWidth="{StaticResource MpStatsMaxWidth}">
+                <StackPanel Margin="14,16,14,18" HorizontalAlignment="Stretch">
                     <TextBlock x:Name="StatsDemoBanner"
                                Visibility="Collapsed"
                                Margin="0,0,0,12"

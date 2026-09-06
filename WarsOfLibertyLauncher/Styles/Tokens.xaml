@@ -446,26 +446,6 @@
          decision and nobody has asked for it.
          =================================================================== -->
     <sys:Double x:Key="SetDescMaxWidth">840</sys:Double>
-
-    <!-- THE STATISTICS PAGE'S MEASURE. 760 for the tables, 16 of gutter, 310 for the side
-         column: 1086, and the two columns sit LEFT with the surplus beyond them.
-
-         The same decision the tournament entrant table already made in this tab, for the same
-         reason its own comment gives - "without this the status column sits at the far right
-         edge of the window, a thousand pixels from the name it describes, at which point it
-         stops reading as a property of that name at all". A statistics row is that shape
-         exactly: a name on the left and a figure hard right, and on a maximised 2560 panel the
-         count of a card ended up two thousand pixels from the card.
-
-         760 IS THE TOURNAMENT TABLE'S NUMBER, not a new one, and 1086 is under the 1100 default
-         window - so at the size this page was designed at, and at every size below it, this
-         cap CANNOT move anything. It only ever acts above the width that used to be the
-         maximum, which is the same rule SetDescMaxWidth above was chosen by.
-
-         Left, not centred: the four shapes tried on the settings surface are recorded above,
-         and a centred cap put the emptiness into two quarters instead of one. Left also keeps
-         the page's left edge where the header and the mod chips already are. -->
-    <sys:Double x:Key="MpStatsMaxWidth">1086</sys:Double>
     <sys:Double x:Key="SetRailWidth">216</sys:Double>         <!-- launcher settings sidebar -->
     <sys:Double x:Key="SetModRailWidth">206</sys:Double>      <!-- per-mod properties sidebar -->
 
