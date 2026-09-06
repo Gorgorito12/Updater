@@ -8548,6 +8548,7 @@ public partial class MultiplayerTab : UserControl
         // either mean nothing or - worse - silently match.
         _deckCivsOpen.Clear();
         _deckTailsOpen.Clear();
+        _deckCardsOpen.Clear();
         _deckCivsSeeded = false;
         _deckCivsExpanded = false;
         _statsCommunityFetchedUtc = DateTime.MinValue;
@@ -8872,17 +8873,24 @@ public partial class MultiplayerTab : UserControl
             TextWrapping = TextWrapping.Wrap,
             MaxWidth = 120,
         };
-        label.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-        label.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        // Lower-case words that wrap under the figure - "players in 7 days" - so prose, not a
+        // tag. It stays well under the 15 of the number it belongs to either way.
+        label.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
+        label.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         cell.Children.Add(label);
 
         host.Children.Add(cell);
     }
 
     /// <summary>The civilization rows the server sent for this mod.</summary>
-    private List<(string Civ, int Played, int Wins, int Losses)> CivRows()
+    /// <summary>
+    /// The civilization rows the server sent, carrying BOTH names: the internal one, which is
+    /// what the flag and the fold are keyed by, and the resolved one, which is what a player is
+    /// allowed to read.
+    /// </summary>
+    private List<(string Civ, string Label, int Played, int Wins, int Losses)> CivRows()
         => (_civStats?.Civs ?? new List<Models.Multiplayer.CivStatEntry>())
-            .Select(c => (c.Civ ?? "", c.Played, c.Wins, c.Losses))
+            .Select(c => (c.Civ ?? "", StatsCivLabel(c.Civ), c.Played, c.Wins, c.Losses))
             .ToList();
 
     /// <summary>The map rows the server sent for this mod.</summary>
@@ -8930,7 +8938,7 @@ public partial class MultiplayerTab : UserControl
         {
             var extra = new TextBlock { Text = trailing, VerticalAlignment = VerticalAlignment.Bottom };
             extra.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-            extra.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+            extra.SetResourceReference(TextBlock.ForegroundProperty, "MpTextLabel");
             Grid.SetColumn(extra, 1);
             row.Children.Add(extra);
         }
@@ -8947,7 +8955,7 @@ public partial class MultiplayerTab : UserControl
             Margin = new Thickness(1, 0, 1, 16),
         };
         note.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
-        note.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        note.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         return note;
     }
 
@@ -9141,8 +9149,9 @@ public partial class MultiplayerTab : UserControl
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 3, 8, 0),
         };
-        names.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        // Names, not a tag. Same rung as the rest of this page's prose.
+        names.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
+        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         words.Children.Add(names);
 
         Grid.SetColumn(words, 0);
@@ -9157,7 +9166,7 @@ public partial class MultiplayerTab : UserControl
         };
         total.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         total.SetResourceReference(TextBlock.FontSizeProperty, "MpFigureSize");
-        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         Grid.SetColumn(total, 1);
         grid.Children.Add(total);
 
@@ -9693,7 +9702,8 @@ public partial class MultiplayerTab : UserControl
     /// order is by matches PLAYED. Ordering by percentage would put whoever won their only
     /// game at the top and call it the best civilization in the mod.</para>
     /// </summary>
-    private UIElement BuildCivTableCard(List<(string Civ, int Played, int Wins, int Losses)> rows)
+    private UIElement BuildCivTableCard(
+        List<(string Civ, string Label, int Played, int Wins, int Losses)> rows)
     {
         var stack = new StackPanel();
         stack.Children.Add(StatsSectionLabel(
@@ -9707,7 +9717,7 @@ public partial class MultiplayerTab : UserControl
         // the mod that tail is the ordinary case for months, not an edge case.
         var ordered = rows
             .OrderByDescending(r => r.Played)
-            .ThenBy(r => r.Civ, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(r => r.Label, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         int minimum = Services.Multiplayer.CivStatsView.MinDecidedForPercent;
         var shown = ordered.Where(r => r.Wins + r.Losses >= minimum).ToList();
@@ -9719,7 +9729,9 @@ public partial class MultiplayerTab : UserControl
 
         foreach (var row in shown)
         {
-            body.Children.Add(BuildCivRow(row.Civ, row.Played, row.Wins, row.Losses, AvgSecondsFor(row.Civ)));
+            body.Children.Add(BuildCivRow(
+                row.Label, row.Played, row.Wins, row.Losses, AvgSecondsFor(row.Civ),
+                BuildCivFlag(StatsVocabulary(), row.Civ, 16)));
         }
 
         if (tail.Count > 0) body.Children.Add(BuildCivTailRow(tail, minimum));
@@ -9770,7 +9782,7 @@ public partial class MultiplayerTab : UserControl
     }
 
     private UIElement BuildCivTailRow(
-        List<(string Civ, int Played, int Wins, int Losses)> tail, int minimum)
+        List<(string Civ, string Label, int Played, int Wins, int Losses)> tail, int minimum)
     {
         var grid = new Grid { Margin = new Thickness(13, 9, 13, 10) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -9792,8 +9804,9 @@ public partial class MultiplayerTab : UserControl
             Text = Strings.Get("MpStatsTailCivsWhy"),
             Margin = new Thickness(0, 3, 8, 0),
         };
-        why.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-        why.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        // A whole sentence. Same rung as the footnote that says the same kind of thing.
+        why.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
+        why.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         words.Children.Add(why);
 
         Grid.SetColumn(words, 0);
@@ -9807,7 +9820,7 @@ public partial class MultiplayerTab : UserControl
         };
         total.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         total.SetResourceReference(TextBlock.FontSizeProperty, "MpFigureSize");
-        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         Grid.SetColumn(total, 1);
         grid.Children.Add(total);
 
@@ -9905,12 +9918,60 @@ public partial class MultiplayerTab : UserControl
             mod,
             GetInstallPath,
             rows.Select(r => r.Card),
-            rows.Select(r => r.Civ));
+            StatsPageCivs(rows));
 
         // Only repaint when something was actually learned, and only if the page is still the
         // one that asked: a repaint that changes nothing is a flicker for no reason.
         if (resolved.Resolved && _activeSubtab == Subtab.Stats) RenderStatsTab();
     }
+
+    /// <summary>
+    /// Every civilization named ANYWHERE on the statistics page.
+    ///
+    /// <para>The three tables carry different sets — the balance and the matchups list what was
+    /// PLAYED, the card table lists who has shared a deck — so resolving only the deck rows'
+    /// left the other two with unresolved names and no flag. One pass over <c>civs.xml</c>
+    /// covering all of them costs the same as one covering a third of them.</para>
+    /// </summary>
+    private IEnumerable<string> StatsPageCivs(
+        IReadOnlyList<Models.Multiplayer.DeckCardEntry>? rows)
+    {
+        var all = new List<string>();
+        if (rows != null) all.AddRange(rows.Select(r => r.Civ ?? ""));
+
+        foreach (var c in _civStats?.Civs ?? new List<Models.Multiplayer.CivStatEntry>())
+            all.Add(c.Civ ?? "");
+
+        foreach (var m in _matchups?.Matchups ?? new List<Models.Multiplayer.MatchupEntry>())
+        {
+            all.Add(m.CivA ?? "");
+            all.Add(m.CivB ?? "");
+        }
+
+        return all.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// This mod's vocabulary if it has already been read, for the surfaces that only want a
+    /// name or a flag. Null until the background pass has run; every caller treats that as
+    /// "not yet" and draws what the server sent.
+    /// </summary>
+    private Services.Multiplayer.DeckCardNames.Vocabulary? StatsVocabulary()
+        => Services.Multiplayer.DeckCardNames.Peek(StatsModId());
+
+    /// <summary>
+    /// A civilization as the player saw it.
+    ///
+    /// <para><b>Not the server's string.</b> That is the mod's INTERNAL name, and for a
+    /// reskinned civilization it names one nobody played: the block Struggle of Indonesia calls
+    /// <c>Ottomans</c> is Surakarta on screen. Falls back to the raw value only when the mod
+    /// cannot be read at all, which is the existing state for the two mods that keep
+    /// <c>civs.xml</c> packed.</para>
+    /// </summary>
+    private string StatsCivLabel(string? civ)
+        => StatsVocabulary() is { } v && !string.IsNullOrWhiteSpace(civ)
+            ? v.CivOf(civ)
+            : civ ?? "";
 
     /// <summary>
     /// Why the deck table is empty, and what would fill it.
@@ -10073,7 +10134,16 @@ public partial class MultiplayerTab : UserControl
 
         var body = new StackPanel();
         body.Children.Add(BuildMatchupHeader(pairColumnKey));
-        foreach (var row in rows) body.Children.Add(BuildMatchupRow(row));
+        foreach (var row in rows)
+        {
+            var v = StatsVocabulary();
+            body.Children.Add(BuildMatchupRow(
+                row,
+                StatsCivLabel(row.CivA),
+                StatsCivLabel(row.CivB),
+                BuildCivFlag(v, row.CivA, 16),
+                BuildCivFlag(v, row.CivB, 16)));
+        }
 
         stack.Children.Add(StatsCard(body));
         stack.Children.Add(StatsFootnote(Strings.Get(hintKey)));
@@ -10228,6 +10298,9 @@ public partial class MultiplayerTab : UserControl
     private readonly HashSet<string> _deckCivsOpen = new(StringComparer.Ordinal);
     private readonly HashSet<string> _deckTailsOpen = new(StringComparer.Ordinal);
 
+    /// <summary>Cards showing what they do, keyed by civilization and card.</summary>
+    private readonly HashSet<string> _deckCardsOpen = new(StringComparer.Ordinal);
+
     /// <summary>Whether the default-open group has been chosen. Once per session, so a
     /// repaint cannot re-close what the player opened.</summary>
     private bool _deckCivsSeeded;
@@ -10252,12 +10325,25 @@ public partial class MultiplayerTab : UserControl
         bool open = _deckCivsOpen.Contains(group.Civ);
 
         var stack = new StackPanel();
-        stack.Children.Add(BuildDeckCivHeader(group, open));
+        stack.Children.Add(BuildDeckCivHeader(group, open, vocabulary));
 
         if (open)
         {
             foreach (var row in group.Shown)
-                stack.Children.Add(BuildDeckCardRow(row, vocabulary));
+            {
+                // Keyed by civilization AND card: the same card appears under several
+                // civilizations, and opening one must not open the others.
+                var key = group.Civ + "\u0000" + row.Card;
+                stack.Children.Add(BuildDeckCardRow(
+                    row,
+                    vocabulary,
+                    _deckCardsOpen.Contains(key),
+                    () =>
+                    {
+                        if (!_deckCardsOpen.Add(key)) _deckCardsOpen.Remove(key);
+                        RenderStatsTab();
+                    }));
+            }
 
             if (group.Tail.Count > 0)
                 stack.Children.Add(BuildDeckTailRow(group));
@@ -10272,12 +10358,49 @@ public partial class MultiplayerTab : UserControl
         return host;
     }
 
+    /// <summary>
+    /// A civilization's flag, at the size the caller asks for, or null when the mod ships none.
+    ///
+    /// <para>The picture comes from the MOD's own art, which is what makes a reskin come out
+    /// right: Struggle of Indonesia's block is still named <c>Ottomans</c> internally and ships
+    /// Surakarta's flag, and Surakarta is the civilization the player saw.</para>
+    ///
+    /// <para>Absent is ordinary, not a fault. One real Wars of Liberty portrait path names a
+    /// file that does not exist, and two of the five catalogued mods keep <c>civs.xml</c> inside
+    /// <c>Data.bar</c> — those resolve no NAME either, so a missing flag is the same state and
+    /// not a new one. Callers reserve the space either way so names do not shift between rows
+    /// that have one and rows that do not.</para>
+    /// </summary>
+    private static FrameworkElement? BuildCivFlag(
+        Services.Multiplayer.DeckCardNames.Vocabulary? names, string? civ, double size)
+    {
+        var flag = names?.CivIconOf(civ);
+        if (flag == null) return null;
+
+        var image = new Image
+        {
+            Source = flag,
+            Width = size,
+            Height = size,
+            Stretch = Stretch.Uniform,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        // 128x128 textures coming down to under twenty pixels. Without this they alias into
+        // mush, which is the same reason the deck tiles set it.
+        RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+        return image;
+    }
+
     /// <summary>The fold header: the civilization, and how many distinctive cards it has.</summary>
     private FrameworkElement BuildDeckCivHeader(
-        Services.Multiplayer.DeckCivGroup group, bool open)
+        Services.Multiplayer.DeckCivGroup group,
+        bool open,
+        Services.Multiplayer.DeckCardNames.Vocabulary? names = null)
     {
         var grid = new Grid { Margin = new Thickness(14, 9, 14, 9) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        // The flag's column, reserved whether or not there is one to put in it.
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -10290,17 +10413,20 @@ public partial class MultiplayerTab : UserControl
         caret.SetResourceReference(TextBlock.ForegroundProperty, "MpTextSecondary");
         grid.Children.Add(WithColumn(caret, 0));
 
+        var flag = BuildCivFlag(names, group.Civ, 18);
+        if (flag != null) grid.Children.Add(WithColumn(flag, 1));
+
         var name = new TextBlock
         {
             Text = group.CivLabel,
             FontWeight = FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 12, 0),
+            Margin = new Thickness(8, 0, 12, 0),
         };
         name.SetResourceReference(TextBlock.FontSizeProperty, "MpBodySize");
         name.SetResourceReference(TextBlock.ForegroundProperty, "MpTextPrimary");
-        grid.Children.Add(WithColumn(name, 1));
+        grid.Children.Add(WithColumn(name, 2));
 
         var count = new TextBlock
         {
@@ -10309,8 +10435,8 @@ public partial class MultiplayerTab : UserControl
         };
         count.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         count.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-        count.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
-        grid.Children.Add(WithColumn(count, 2));
+        count.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
+        grid.Children.Add(WithColumn(count, 3));
 
         // The whole header is the hit target, not the caret. A four-pixel triangle is not a
         // button on anybody's screen.
@@ -10327,15 +10453,26 @@ public partial class MultiplayerTab : UserControl
     /// <summary>One card.</summary>
     /// <remarks><c>internal static</c> so the tests can build the real row — nothing else
     /// constructs it and no compile step checks a resource looked up by name.</remarks>
+    /// <param name="open">Whether this row is showing what the card does.</param>
+    /// <param name="onToggle">Invoked when the row is clicked. Null makes the row inert, which
+    /// is what the tests want and what a row with nothing to say gets anyway.</param>
     internal static FrameworkElement BuildDeckCardRow(
         Services.Multiplayer.DeckCardRow row,
-        Services.Multiplayer.DeckCardNames.Vocabulary? names = null)
+        Services.Multiplayer.DeckCardNames.Vocabulary? names = null,
+        bool open = false,
+        Action? onToggle = null)
     {
         // Resolved from the mod's OWN tech tree, and the internal name is the fallback rather
         // than the value. For one build a comment claimed the resolution happened while the
         // line under it assigned the identifier untouched, which is how HCXPRefrigeration
         // reached a player - the launcher's oldest rule is that an internal name never does.
         var vocabulary = names ?? Services.Multiplayer.DeckCardNames.Vocabulary.None;
+
+        // The modder's own sentence when it wrote one, then the effects with their numbers.
+        // Reading only the sentence showed nothing at all for most of the table: every unit
+        // shipment and crate carries no RolloverTextID, so the description has to be BUILT
+        // from the card's effects, which is what the deck detail panel already does.
+        var lines = vocabulary.DescriptionLinesOf(row.Card);
         bool raw = string.Equals(row.Label, row.Card, StringComparison.Ordinal);
         var icon = vocabulary.IconOf(row.Card);
 
@@ -10384,28 +10521,73 @@ public partial class MultiplayerTab : UserControl
         // this line. An initialiser cannot express "leave this property alone".
         if (raw) nameText.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
 
-        // What the card does, on hover. A card with no description gets NO tooltip: absence is
-        // the honest answer, and a placeholder would be the launcher inventing one.
-        var description = vocabulary.DescriptionOf(row.Card);
-        if (!string.IsNullOrWhiteSpace(description))
+        // The caret rides INSIDE the name cell rather than taking a column of its own: the icon
+        // already owns column 0, and a fifth column would push every figure on the page.
+        var head = new StackPanel
         {
-            nameText.ToolTip = new TextBlock
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(10, 0, 12, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        if (lines.Count > 0)
+        {
+            var caret = new TextBlock
             {
-                Text = description,
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 320,
+                Text = open ? "\u25be" : "\u25b8",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0),
             };
+            caret.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
+            caret.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+            head.Children.Add(caret);
         }
+        nameText.Margin = new Thickness(0);
+        head.Children.Add(nameText);
 
-        grid.Children.Add(WithColumn(nameText, 1));
+        grid.Children.Add(WithColumn(head, 1));
         grid.Children.Add(WithColumn(BuildDeckCountCell(row, meta), 2));
 
-        return new Border
+        var body = new StackPanel();
+        body.Children.Add(grid);
+
+        // Opened: what the card actually does, with the numbers. No height cap - a card with a
+        // dozen effects is long, and trimming it would hide precisely what was clicked for.
+        if (open && lines.Count > 0)
         {
-            Child = grid,
+            var text = new StackPanel { Margin = new Thickness(46, 0, 14, 10) };
+            foreach (var line in lines)
+            {
+                var block = new TextBlock { Text = line, TextWrapping = TextWrapping.Wrap };
+                // The rung this page already uses for prose - StatsFootnote sits here too.
+                // NOT MpTagSize: at 9 this was the smallest type in the launcher, a token whose
+                // own remarks say it may be that small "because it is always letter-spaced
+                // uppercase inside a chip". These are wrapping sentences, and they were coming
+                // out smaller than the footnotes that explain the table above them.
+                block.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
+                block.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
+                block.Margin = new Thickness(0, 0, 0, 3);
+                text.Children.Add(block);
+            }
+            body.Children.Add(text);
+        }
+
+        var shell = new Border
+        {
+            Child = body,
             BorderBrush = (Brush)Application.Current.FindResource("MpRimHair"),
             BorderThickness = new Thickness(0, 0, 0, 1),
         };
+
+        // A row with nothing to say is NOT a button. Half this table is unit shipments and
+        // crates whose only description is their own name - the engine has no wording for an
+        // effect aimed at the player - and a caret that opens nothing is a promise the data
+        // cannot keep. Those rows stay exactly as they were.
+        if (lines.Count == 0 || onToggle == null) return shell;
+
+        var button = new Button { Content = shell, Cursor = System.Windows.Input.Cursors.Hand };
+        button.SetResourceReference(FrameworkElement.StyleProperty, "MpBareButton");
+        button.Click += (_, _) => onToggle();
+        return button;
     }
 
     /// <summary>
@@ -10467,8 +10649,9 @@ public partial class MultiplayerTab : UserControl
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 3, 8, 0),
         };
-        names.SetResourceReference(TextBlock.FontSizeProperty, "MpTagSize");
-        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        // Names, not a tag. Same rung as the rest of this page's prose.
+        names.SetResourceReference(TextBlock.FontSizeProperty, "MpPillSize");
+        names.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         words.Children.Add(names);
 
         grid.Children.Add(WithColumn(words, 0));
@@ -10482,7 +10665,7 @@ public partial class MultiplayerTab : UserControl
         };
         total.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
         total.SetResourceReference(TextBlock.FontSizeProperty, "MpFigureSize");
-        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextGhost");
+        total.SetResourceReference(TextBlock.ForegroundProperty, "MpTextFaint");
         grid.Children.Add(WithColumn(total, 1));
 
         var seeAll = new Button
@@ -10577,7 +10760,17 @@ public partial class MultiplayerTab : UserControl
     /// <c>internal static</c> so <c>DialogXamlTests</c> can build the real row — nothing else
     /// constructs it and no compile step checks a resource looked up by name.
     /// </remarks>
-    internal static FrameworkElement BuildMatchupRow(Models.Multiplayer.MatchupEntry row)
+    /// <param name="labelA">The first civilization as the player saw it; falls back to the
+    /// server's string when the mod cannot be read.</param>
+    /// <param name="labelB">The same for the second.</param>
+    /// <param name="flagA">Its flag, or null.</param>
+    /// <param name="flagB">The other's.</param>
+    internal static FrameworkElement BuildMatchupRow(
+        Models.Multiplayer.MatchupEntry row,
+        string? labelA = null,
+        string? labelB = null,
+        FrameworkElement? flagA = null,
+        FrameworkElement? flagB = null)
     {
         var meta = (double)Application.Current.FindResource("MpMetaSize");
         var mono = (FontFamily)Application.Current.FindResource("MonoFont");
@@ -10587,17 +10780,38 @@ public partial class MultiplayerTab : UserControl
         grid.Margin = new Thickness(14, 0, 14, 0);
         grid.MinHeight = 34;
 
-        grid.Children.Add(WithColumn(new TextBlock
+        // The record below belongs to the FIRST of the two, so the pair has to read in that
+        // order — "A vs B" with B's record would be the same numbers meaning the opposite.
+        var nameA = string.IsNullOrWhiteSpace(labelA) ? row.CivA : labelA!;
+        var nameB = string.IsNullOrWhiteSpace(labelB) ? row.CivB : labelB!;
+
+        var pair = new StackPanel
         {
-            // The record below belongs to the FIRST of the two, so the pair has to read in that
-            // order — "A vs B" with B's record would be the same numbers meaning the opposite.
-            Text = Strings.Format("MpMatchupPair", row.CivA, row.CivB),
-            Foreground = (Brush)Application.Current.FindResource("MpTextPrimary"),
-            FontSize = meta,
-            TextTrimming = TextTrimming.CharacterEllipsis,
+            Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, CivTrailingGap(0, specs.Count), 0),
-        }, 0));
+            // The whole pair, in one piece, for when the cell is too narrow to show it.
+            ToolTip = TooltipHelper.Wrap(Strings.Format("MpMatchupPair", nameA, nameB)),
+        };
+
+        TextBlock Word(string text, string brush, double left, double right) =>
+            new()
+            {
+                Text = text,
+                Foreground = (Brush)Application.Current.FindResource(brush),
+                FontSize = meta,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(left, 0, right, 0),
+            };
+
+        if (flagA != null) { flagA.Margin = new Thickness(0, 0, 7, 0); pair.Children.Add(flagA); }
+        pair.Children.Add(Word(nameA, "MpTextPrimary", 0, 0));
+        pair.Children.Add(Word(Strings.Get("MpMatchupVs"), "MpTextGhost", 6, 6));
+        if (flagB != null) { flagB.Margin = new Thickness(0, 0, 7, 0); pair.Children.Add(flagB); }
+        pair.Children.Add(Word(nameB, "MpTextPrimary", 0, 0));
+
+        grid.Children.Add(WithColumn(pair, 0));
 
         void Number(int column, string text, string brush)
             => grid.Children.Add(WithColumn(new TextBlock
@@ -10671,8 +10885,13 @@ public partial class MultiplayerTab : UserControl
     /// viewer's own computed here by <c>CivStatsView</c> from their history. One builder for
     /// both is what stops the two disagreeing about when a percentage may be shown.</para>
     /// </remarks>
+    /// <param name="civ">The civilization AS THE PLAYER SAW IT — never the server's internal
+    /// string, which for a reskin names one nobody played.</param>
+    /// <param name="flag">Its flag, or null. Drawn inside the name cell rather than as a column
+    /// of its own, so the shared column contract in <c>CivTableLayout</c> is untouched.</param>
     internal static FrameworkElement BuildCivRow(
-        string civ, int played, int wins, int losses, int? avgSeconds)
+        string civ, int played, int wins, int losses, int? avgSeconds,
+        FrameworkElement? flag = null)
     {
         var meta = (double)Application.Current.FindResource("MpMetaSize");
         var mono = (FontFamily)Application.Current.FindResource("MonoFont");
@@ -10682,15 +10901,26 @@ public partial class MultiplayerTab : UserControl
         grid.Margin = new Thickness(14, 0, 14, 0);
         grid.MinHeight = 34;
 
-        grid.Children.Add(WithColumn(new TextBlock
+        var nameCell = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, CivTrailingGap(0, columns), 0),
+        };
+        if (flag != null)
+        {
+            flag.Margin = new Thickness(0, 0, 7, 0);
+            nameCell.Children.Add(flag);
+        }
+        nameCell.Children.Add(new TextBlock
         {
             Text = civ,
             Foreground = (Brush)Application.Current.FindResource("MpTextPrimary"),
             FontSize = meta,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, CivTrailingGap(0, columns), 0),
-        }, 0));
+        });
+        grid.Children.Add(WithColumn(nameCell, 0));
 
         void Number(int column, string text, string brush)
             => grid.Children.Add(WithColumn(new TextBlock

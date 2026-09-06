@@ -4991,10 +4991,20 @@ public static class Strings
             [LangEn] = "MATCHUP",
             [LangEs] = "ENFRENTAMIENTO",
         },
+        // The pair as ONE string. Still used, as the row's tooltip: the cell itself is built
+        // from parts now so a flag can sit beside each civilization, and an ellipsised pair
+        // needs somewhere to say the whole thing.
         ["MpMatchupPair"] = new()
         {
             [LangEn] = "{0} vs {1}",
             [LangEs] = "{0} vs {1}",
+        },
+        // The separator alone, for the built cell. Kept as a string rather than a literal
+        // because it is a word, and a word is the kind of thing that gets translated.
+        ["MpMatchupVs"] = new()
+        {
+            [LangEn] = "vs",
+            [LangEs] = "vs",
         },
         ["MpStatsMapsTitle"] = new()
         {
